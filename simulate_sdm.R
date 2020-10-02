@@ -120,7 +120,7 @@ m1<-ppSpace(y ~ xx+yy+effort, sPoints = occ_thinsp,
 )
 
 
-m2<-ppSpace2(y ~ xx+yy+offset(logeffort), sPoints = occ_thinsp,
+m2<-ppSpace(y ~ xx+yy+offset(logeffort), sPoints = occ_thinsp,
              explanaMesh = explana,
              ppWeight = weight,
              prior.range = c(200,0.5),
@@ -148,7 +148,7 @@ mapMean <- mask(mapMean,region) #spacePoly
 plot(mapMean, col = colo, axes = TRUE, box = FALSE, main = paste0(names(m)[1]," - ",nrow(occ_thin)," obs",sep=" "),xlim=xlim,ylim=ylim,legend.shrink=0.9,legend.width=1.5)
 points(occ_thinsp,pch=1,col=gray(0,0.25),cex=0.6)
 grid(10,6,col=gray(0,0.25),lty=3)
-mapMean<-mapSpace2(m[[2]],dims=dim(r)[1:2],type="mean")
+mapMean<-mapSpace(m[[2]],dims=dim(r)[1:2],type="space")
 mapMean <- mask(mapMean,region) #spacePoly
 plot(mapMean, col = colo, axes = TRUE, box = FALSE, main = paste0(names(m)[2]," - ",nrow(occ_thin)," obs",sep=" "),xlim=xlim,ylim=ylim,legend.shrink=0.9,legend.width=1.5)
 points(occ_thinsp,pch=1,col=gray(0,0.25),cex=0.6)
