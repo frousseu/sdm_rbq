@@ -20,12 +20,12 @@ prj<-"+proj=lcc +lat_0=47 +lon_0=-75 +lat_1=49 +lat_2=77 +x_0=0 +y_0=0 +datum=NA
 win<-c(0,1000,0,1000)
 o<-owin(win[1:2],win[3:4])
 nu=2
-rangex=300
+rangex=100
 kappa=sqrt(8*nu)/rangex
 b0=-6
 b1=0.002
 b2=b1
-sigma=sqrt(0.00000000001)
+sigma=sqrt(0.50000000001)
 #exp(b0) * diff(range(o$x)) * diff(range(o$y))
 
 #set.seed(1234) # 123 avec -17 aberrant
@@ -93,7 +93,7 @@ occ_thinsp<-as(occ_thin,"Spatial")
 region<-as(extent(win),"SpatialPolygons")
 proj4string(region)<-prj
 
-pedge<-0.04
+pedge<-0.03
 edge<-min(c(diff(bbox(region)[0.2,])*pedge,diff(bbox(region)[2,])*pedge))
 edge
 
@@ -101,11 +101,11 @@ edge
 
 Mesh<-inla.mesh.2d(loc.domain = as(extent(region),"SpatialPoints"),max.edge = c(edge,edge*1.5),min.angle = 21,cutoff = edge/2,offset = c(edge,edge*2),crs = crs(region))
 explana<-explanaMesh(sPoly=region,mesh=Mesh,X=r)
-weight<-ppWeight(sPoly=region, mesh=Mesh)
+weight<-ppWeight2(sPoly=region, mesh=Mesh)
 
 
 bpriors1<-list(prec=list(default=1/(10)^2,Intercept=1/(100)^2,effort=1/(10)^2,logeffort=1/(100.00000001)^2),mean=list(default=0,Intercept=0,effort=0,logeffort=0))
-m1<-ppSpace(y ~ xx+yy+logeffort, sPoints = occ_thinsp,
+m1<-ppSpace(y ~ xx+yy, sPoints = occ_thinsp,
             explanaMesh = explana,
             ppWeight = weight,
             prior.range = c(20000,NA),
@@ -113,21 +113,21 @@ m1<-ppSpace(y ~ xx+yy+logeffort, sPoints = occ_thinsp,
             num.threads = 7,
             many = TRUE,
             control.inla = list(int.strategy = "eb"),
-            bias = "logeffort",
+            bias = NULL,
             control.fixed = bpriors1,
             orthoCons = FALSE
 )
 
 bpriors2<-list(prec=list(default=1/(10)^2,Intercept=1/(100)^2,effort=1/(10)^2,logeffort=1/(0.00000001)^2),mean=list(default=0,Intercept=0,effort=0,logeffort=1))
-m2<-ppSpace(y ~ xx+yy+logeffort, sPoints = occ_thinsp,
+m2<-ppSpace(y ~ xx+yy, sPoints = occ_thinsp,
              explanaMesh = explana,
              ppWeight = weight,
-             prior.range = c(200,0.5),
-             prior.sigma = c(1,0.5),
+             prior.range = c(100,0.05),
+             prior.sigma = c(0.5,0.05),
              num.threads = 7,
              many = TRUE,
              control.inla = list(int.strategy = "eb"),
-             bias = "logeffort",
+             bias = NULL,
              control.fixed = bpriors2,
              orthoCons = FALSE
 )
