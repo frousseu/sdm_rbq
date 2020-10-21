@@ -14,18 +14,18 @@ library(RandomFields)
 seed<-sample(1:1000,1)
 set.seed(seed)
 
-colo<-colorRampPalette(c("grey92","steelblue4","steelblue2","gold2","tomato2","red4"))(200)
+colo<-colorRampPalette(c("grey85","steelblue4","steelblue2","gold2","tomato2","red4"))(200)
 prj<-"+proj=lcc +lat_0=47 +lon_0=-75 +lat_1=49 +lat_2=77 +x_0=0 +y_0=0 +datum=NAD83 +units=km +no_defs"
 
 win<-c(0,1000,0,1000)
 o<-owin(win[1:2],win[3:4])
 nu=2
-rangex=100
+rangex=300
 kappa=sqrt(8*nu)/rangex
 b0=-6
 b1=0.002
 b2=b1
-sigma=sqrt(0.50000000001)
+sigma=sqrt(0.0200000001)
 #exp(b0) * diff(range(o$x)) * diff(range(o$y))
 
 #set.seed(1234) # 123 avec -17 aberrant
@@ -57,7 +57,7 @@ rx<-setValues(r,coordinates(r)[,1])
 ry<-setValues(r,coordinates(r)[,2])
 r<-stack(rx,ry)
 
-model<-RMexp(var=2,scale=25)+RMnugget(var=0)+RMtrend(mean=0)
+model<-RMexp(var=4,scale=25)+RMnugget(var=0)+RMtrend(mean=-3)
 x.seq<-seq(extent(r)[1],extent(r)[2],length=300) 
 y.seq<-seq(extent(r)[3],extent(r)[4],length=300)
 sims<-RFsimulate(model,x=x.seq,y=y.seq)
@@ -93,7 +93,7 @@ occ_thinsp<-as(occ_thin,"Spatial")
 region<-as(extent(win),"SpatialPolygons")
 proj4string(region)<-prj
 
-pedge<-0.03
+pedge<-0.04
 edge<-min(c(diff(bbox(region)[0.2,])*pedge,diff(bbox(region)[2,])*pedge))
 edge
 
@@ -101,19 +101,20 @@ edge
 
 Mesh<-inla.mesh.2d(loc.domain = as(extent(region),"SpatialPoints"),max.edge = c(edge,edge*1.5),min.angle = 21,cutoff = edge/2,offset = c(edge,edge*2),crs = crs(region))
 explana<-explanaMesh(sPoly=region,mesh=Mesh,X=r)
-weight<-ppWeight2(sPoly=region, mesh=Mesh)
+weight<-ppWeight(sPoly=region, mesh=Mesh)
 
 
-bpriors1<-list(prec=list(default=1/(10)^2,Intercept=1/(100)^2,effort=1/(10)^2,logeffort=1/(100.00000001)^2),mean=list(default=0,Intercept=0,effort=0,logeffort=0))
-m1<-ppSpace(y ~ xx+yy, sPoints = occ_thinsp,
+bpriors1<-list(prec=list(default=1/(10)^2,Intercept=1/(100)^2,effort=1/(10)^2,logeffort=1/(0.00000000001)^2),mean=list(default=0,Intercept=0,effort=0,logeffort=1))
+m1<-ppSpace(y ~ xx+yy+logeffort, sPoints = occ_thinsp,
             explanaMesh = explana,
             ppWeight = weight,
-            prior.range = c(20000,NA),
-            prior.sigma = c(0.0001,NA),
+            prior.range = c(100,0.05),
+            prior.sigma = c(1,0.05),
             num.threads = 7,
             many = TRUE,
             control.inla = list(int.strategy = "eb"),
-            bias = NULL,
+            fix = "logeffort",
+            sboffset = NULL,
             control.fixed = bpriors1,
             orthoCons = FALSE
 )
@@ -123,11 +124,12 @@ m2<-ppSpace(y ~ xx+yy, sPoints = occ_thinsp,
              explanaMesh = explana,
              ppWeight = weight,
              prior.range = c(100,0.05),
-             prior.sigma = c(0.5,0.05),
+             prior.sigma = c(1,0.05),
              num.threads = 7,
              many = TRUE,
              control.inla = list(int.strategy = "eb"),
-             bias = NULL,
+             fix = NULL,
+             sboffset = "effort",
              control.fixed = bpriors2,
              orthoCons = FALSE
 )
@@ -138,20 +140,22 @@ par(mfrow=c(2,2),oma=c(0,4,0,4))
 xlim<-bbox(region)[1,]
 ylim<-bbox(region)[2,]
 image.plot(list(x=Lam$xcol, y=Lam$yrow, z=t(exp(rf.s))), main=paste0('Simulated intensity - ',nrow(occ)," obs",sep=" "),asp=1,col=colo)
-#points(xy,pch=1,col=gray(0,0.05),cex=0.6)
-grid(10,6,col=gray(0,0.15),lty=3)
-plot(eff[[1]],xlim=xlim,ylim=ylim,main="Effort (en entier, beaucoup de 0)",col=colo)
-grid(10,6,col=gray(0,0.15),lty=3)
+points(occ_thinsp,pch=1,col=gray(0,0.25),cex=0.6)
+grid(10,6,col=gray(0,0.25),lty=3)
+eff2<-eff[[1]]
+eff2[eff2==0]<-NA
+plot(eff2,xlim=xlim,ylim=ylim,main="Effort (en entier, beaucoup de 0)",col=colo)
+grid(10,6,col=gray(0,0.25),lty=3)
 mapMean<-mapSpace(m[[1]],dims=dim(r)[1:2],type="mean")
 mapMean <- mask(mapMean,region) #spacePoly
 plot(mapMean, col = colo, axes = TRUE, box = FALSE, main = paste0(names(m)[1]," - ",nrow(occ_thin)," obs",sep=" "),xlim=xlim,ylim=ylim,legend.shrink=0.9,legend.width=1.5)
 #points(occ_thinsp,pch=1,col=gray(0,0.25),cex=0.6)
-grid(10,6,col=gray(0,0.15),lty=3)
+grid(10,6,col=gray(0,0.25),lty=3)
 mapMean<-mapSpace(m[[2]],dims=dim(r)[1:2],type="mean")
 mapMean <- mask(mapMean,region) #spacePoly
 plot(mapMean, col = colo, axes = TRUE, box = FALSE, main = paste0(names(m)[2]," - ",nrow(occ_thin)," obs",sep=" "),xlim=xlim,ylim=ylim,legend.shrink=0.9,legend.width=1.5)
 #points(occ_thinsp,pch=1,col=gray(0,0.25),cex=0.6)
-grid(10,6,col=gray(0,0.15),lty=3)
+grid(10,6,col=gray(0,0.25),lty=3)
 lapply(m,function(i){summary(i)$coef})
 print(seed)
 
