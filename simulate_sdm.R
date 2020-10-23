@@ -20,12 +20,12 @@ prj<-"+proj=lcc +lat_0=47 +lon_0=-75 +lat_1=49 +lat_2=77 +x_0=0 +y_0=0 +datum=NA
 win<-c(0,1000,0,1000)
 o<-owin(win[1:2],win[3:4])
 nu=2
-rangex=300
+rangex=200
 kappa=sqrt(8*nu)/rangex
 b0=-6
 b1=0.002
 b2=b1
-sigma=sqrt(0.0200000001)
+sigma=sqrt(0.100000001)
 #exp(b0) * diff(range(o$x)) * diff(range(o$y))
 
 #set.seed(1234) # 123 avec -17 aberrant
@@ -57,14 +57,22 @@ rx<-setValues(r,coordinates(r)[,1])
 ry<-setValues(r,coordinates(r)[,2])
 r<-stack(rx,ry)
 
-model<-RMexp(var=4,scale=25)+RMnugget(var=0)+RMtrend(mean=-3)
+model<-RMexp(var=3,scale=35)+RMnugget(var=0)+RMtrend(mean=-1)
 x.seq<-seq(extent(r)[1],extent(r)[2],length=300) 
 y.seq<-seq(extent(r)[3],extent(r)[4],length=300)
 sims<-RFsimulate(model,x=x.seq,y=y.seq)
-eff<-exp(raster(sims))
-#hist(values(eff))
+rsims<-raster(sims)
+modsims<-rsims
+modsims<-setValues(modsims,rescale((-1*coordinates(modsims)[,1]^(1/10)-1*coordinates(modsims)[,2]^(1/10)),to=c(0,1)))
+rsims<-rsims
+par(mfrow=c(1,3))
+plot(modsims)
+eff<-exp(rsims)
+plot(eff)
+eff<-exp(rsims)*modsims
 eff<-round(resample(eff,r,method="ngb"))
 plot(eff)
+par(mfrow=c(1,1))
 eff<-stack(eff,setValues(eff,1:ncell(eff)))
 le<-values(log(eff[[1]]))
 le<-ifelse(is.infinite(le),0,le)           
@@ -93,7 +101,7 @@ occ_thinsp<-as(occ_thin,"Spatial")
 region<-as(extent(win),"SpatialPolygons")
 proj4string(region)<-prj
 
-pedge<-0.04
+pedge<-0.035
 edge<-min(c(diff(bbox(region)[0.2,])*pedge,diff(bbox(region)[2,])*pedge))
 edge
 
@@ -144,7 +152,7 @@ points(occ_thinsp,pch=1,col=gray(0,0.25),cex=0.6)
 grid(10,6,col=gray(0,0.25),lty=3)
 eff2<-eff[[1]]
 eff2[eff2==0]<-NA
-plot(eff2,xlim=xlim,ylim=ylim,main="Effort (en entier, beaucoup de 0)",col=colo)
+plot(eff2,xlim=xlim,ylim=ylim,main="Effort",col=colo)
 grid(10,6,col=gray(0,0.25),lty=3)
 mapMean<-mapSpace(m[[1]],dims=dim(r)[1:2],type="mean")
 mapMean <- mask(mapMean,region) #spacePoly
