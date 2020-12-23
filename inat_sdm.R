@@ -24,7 +24,6 @@ s<-st_as_sf(d,coords=c("decimalLongitude","decimalLatitude"),crs=4326)
 s<-st_transform(s,prj)
 #o<-st_intersects(s,q)
 
-
 g<-st_make_grid(q,cellsize=10)
 o<-st_intersects(s,g)
 s$cell<-unlist(lapply(o,"[",1))
