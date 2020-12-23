@@ -36,18 +36,18 @@ params<-list(
   nu=c(2), # matern smoothness parameters 
   rangex=c(400), # range of spatial field
   kappa=c(sqrt(8*nu)/rangex), 
-  b0=c(-7,-10,-7,-10), # intercept (determines the nb of points generated
+  b0=c(-6,-6), # intercept (determines the nb of points generated
   b1=c(0.002), # beta coefficient on X gradient
-  b2=c(b1), # beta coefficient on Y gradient
-  sigma=sqrt(c(0.00000001,0.00000001,0.5,0.5)), # sd of spatial field
+  b2=c(0.002), # beta coefficient on Y gradient
+  sigma=sqrt(c(0.00000001,0.5)), # sd of spatial field
 
   ### Simulated effort
-  evar=c(0), # variance of effort spatial field
+  evar=c(3), # variance of effort spatial field
   erange=c(25), # range of effort spatial field
   emean=c(0), # mean of effort spatial field
   eb1=c(-1), # strength of gradient in x
   eb2=c(-1), # strength of gradient in y
-  eexp=c(0) # exponential decrease in effort gradient
+  eexp=c(-4) # exponential decrease in effort gradient
 )
 
 params<-lapply(params,function(i){rep(i,length.out=max(sapply(params,length)))})
@@ -162,7 +162,7 @@ m<-ppSpace(y ~ xx+yy, sPoints = occ_thinsp,
              many = TRUE,
              control.inla = list(int.strategy = "eb"),
              fix = NULL,
-             sboffset = NULL,#"effort",
+             sboffset = "effort",
              control.fixed = bpriors,
              orthoCons = FALSE
 )
