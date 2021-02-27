@@ -37,17 +37,19 @@ s<-s[!duplicated(as.data.frame(s[,c("recordedBy","species","cell")])[,1:3]),]
 #plot(st_geometry(q),border="grey65",add=TRUE)
 
 #e<-rasterize(s,predictors[[1]],field=1,fun="count",background=0)[[1]]
-e<-rasterize(s[s$class%in%c("Aves"),1],predictors[[1]],field=1,fun="count",background=0)
+e<-rasterize(s[s$kingdom%in%c("Plantae"),1],predictors[[1]],field=1,fun="count",background=0)
+#e<-rasterize(s[s$genus%in%c("Carex"),1],predictors[[1]],field=1,fun="count",background=0)
 names(e)<-"sbias"
 rp<-stack(predictors,e)#/10000)
 
 #e2<-rasterize(occ,predictors[[1]],field=1,fun="count",background=0)
+#raw<-rasterize(occ,rp[["sbias"]],field=1,fun="count",background=0)/rp[["sbias"]]
 
 #################################################
 #################################################
 
 
-species<-c("Setophaga americana")
+species<-c("Juglans cinerea")
 f<-function(i){as.integer(any(i==sp))}
 
 init<-vector(mode="list",length=length(species)*2)
@@ -64,7 +66,7 @@ region<-st_buffer(concaveman(st_cast(q,"MULTIPOINT"),concavity=2),100)
 domain<-st_coordinates(st_cast(region,"MULTIPOINT"))[,1:2]
 region<-as(region,"Spatial")
 
-pedge<-0.04
+pedge<-0.01
 edge<-min(c(diff(bbox(region)[0.2,])*pedge,diff(bbox(region)[2,])*pedge))
 edge
 
@@ -93,8 +95,8 @@ f<-formula(paste("y~",paste(vars,collapse="+")))
 mpp <- ppSpace(f, sPoints = occsp,
                explanaMesh = explana,
                ppWeight = weight,
-               prior.range = c(50,0.1),
-               prior.sigma = c(0.5,0.1),
+               prior.range = c(100,0.01),
+               prior.sigma = c(0.1,0.01),
                num.threads=7,
                many=TRUE,
                control.inla = list(int.strategy = "eb"),
@@ -111,6 +113,8 @@ for(i in 1:length(m)){
   mapMean<-mapSpace(m[[i]],dims=dim(r)[1:2],type="mean",sPoly=as(q,"Spatial"))
   #mapMean <- mask(mapMean,q[q$NAME_1=="Québec",]) #spacePoly
   mapMean <- mask(mapMean,q) #spacePoly
+  buff<-st_as_sf(st_buffer(st_convex_hull(st_union(occ)),dist=500))
+  mapMean <- mask(mapMean,buff) #spacePoly
   water<-predictors[["water"]]
   water[water<0.99]<-NA
   water<-resample(water,mapMean)
@@ -118,13 +122,16 @@ for(i in 1:length(m)){
   names(mapMean)<-paste(sp,names(m)[i])
   init[[ninit]]<-mapMean
   ninit<-ninit+1
-  plot(mapMean, col = colo, axes = TRUE, box = FALSE, main = paste(names(m)[i],sp,sep=" - "))#,xlim=c(-1100,-900),ylim=c(200,300))
+  plot(buff,border=FALSE)
+  plot(mapMean,add=TRUE, col = colo, axes = TRUE, box = FALSE, main = paste(names(m)[i],sp,sep=" - "))#,xlim=c(-1100,-900),ylim=c(200,300))
   #points(pressp,pch=16,col=alpha("forestgreen",0.99),cex=0.2)
   points(occsp,pch=16,col=alpha("black",0.95),cex=0.6)
   plot(st_geometry(q),add=TRUE,border=gray(0,0.15))
   ### contour
   ID<-inla.stack.index(attributes(m[[i]])$Stack,tag="est")$data
   #contour(mapMean,levels=quantile(m[[i]]$summary.fitted.values[["mean"]][ID],0.05),add=TRUE,col="red")
+  lim<-rasterToContour(mapMean,levels=max(values(mapMean),na.rm=TRUE)*0.07)
+  plot(lim,add=TRUE,col=alpha("steelblue",0.35),lwd=2)
 }
 par(mfrow=c(1,1))
 
@@ -161,4 +168,15 @@ axis(2)
 plot(swe,add=TRUE,border=gray(0,0.5))
 plot(occs,pch=1,cex=3*m$summary.fitted.values[index.est,"mean"],col=gray(0.1,0.3),add=TRUE)
 proj<-
+
+
+h<-raster("D:/NFI_MODIS250m_2011_kNN/NFI_MODIS250m_2011_kNN_Species_Frax_nig_v1.tif")
+h<-aggregate(h,20)
+ 
+
+raw<-rasterize(occ,rp[["sbias"]],field=1,fun="count",background=0)/rp[["sbias"]]
+raw[raw<0.5]<-NA
+raw<-rasterToPolygons(raw,na.rm=TRUE)
+points(coordinates(raw)[,1],coordinates(raw)[,2],pch=1,cex=1,col="white")
+plot(Mesh,add=TRUE,col=gray(0,0.9))
 
