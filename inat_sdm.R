@@ -1,24 +1,40 @@
 
 
-library(mapSpecies)
-library(sf)
-library(data.table)
 library(scales)
+library(data.table)
+library(rgbif)
+library(rmapshaper)
+library(spex)
+library(dplyr)
 library(raster)
+library(RandomFields)
+library(sf)
+library(mapSpecies)
 library(concaveman)
 library(fields)
+library(foreach)
+library(doParallel)
+library(FRutils)
+library(viridisLite)
 
 #d<-fread("C:/Users/rouf1703/Documents/UdeS/Programmation/mapSpecies/observations-96473_20200626QC.csv")
 #spinat<-d[,.N,by=.(taxon_species_name)][order(-N),][N>100,]$taxon_species_name
 #d<-d[d$taxon_species_name%in%spinat,]
 #d[,.(n=.N),by=.(taxon_species_name)][order(-n)][1:100]
 
+load("/data/predictors_sdm/predictors.RData")
+
 keep<-c("kingdom","phylum","class","order","family","genus","species","countryCode","stateProvince","decimalLatitude","decimalLongitude","coordinateUncertaintyInMeters","day","month","year","recordedBy")
 d<-fread("D:/iNatGBIF/0137377-200613084148143.csv",encoding="UTF-8",select=keep)
-d<-d[!is.na(d$decimalLatitude),]
+d<-fread("/data/predictors_sdm/inat/0137377-200613084148143.csv",encoding="UTF-8",select=keep)
 d<-d[d$countryCode%in%c("US","CA"),]
-prov<-c("Québec","Ontario","New Brunswick","Newfoundland and Labrador","Vermont","Maine","New Hampshire","New York","Massachusetts","Nunavut","Nova Scotia")
+#prov<-c("Québec","Ontario","New Brunswick","Newfoundland and Labrador","Vermont","Maine","New Hampshire","New York","Massachusetts","Nunavut","Nova Scotia")
 #d<-d[d$stateProvince%in%prov,]
+d<-d[d$kingdom%in%c("Plantae"),]
+#d<-d[d$phylum%in%c("Chordata"),]
+#d<-d[d$phylum%in%c("Arthropoda"),]
+#d<-d[d$class%in%c("Reptilia","Amphibia"),]
+d<-d[!is.na(d$decimalLatitude),]
 d<-d[which(d$coordinateUncertaintyInMeters<50000),]
 s<-st_as_sf(d,coords=c("decimalLongitude","decimalLatitude"),crs=4326)
 s<-st_transform(s,prj)
@@ -36,49 +52,34 @@ s<-s[!duplicated(as.data.frame(s[,c("recordedBy","species","cell")])[,1:3]),]
 #plot(log(r),xlim=c(-400,800),ylim=c(-250,250))
 #plot(st_geometry(q),border="grey65",add=TRUE)
 
+e<-rasterize(s[,1],predictors[[1]],field=1,fun="count",background=0)
 #e<-rasterize(s,predictors[[1]],field=1,fun="count",background=0)[[1]]
-e<-rasterize(s[s$kingdom%in%c("Plantae"),1],predictors[[1]],field=1,fun="count",background=0)
 #e<-rasterize(s[s$genus%in%c("Carex"),1],predictors[[1]],field=1,fun="count",background=0)
-names(e)<-"sbias"
-rp<-stack(predictors,e)#/10000)
+
+sspecies<-s[,"species"]
+cells<-raster::extract(e,sspecies,cellnumbers=T)
+sspecies[,c("cell")]<-cells[,1]
+sspecies<-sspecies[!duplicated(as.data.table(sspecies[,c("species","cell")])[,geometry:=NULL]),]
+especies<-rasterize(sspecies,predictors[[1]],field=1,fun="count",background=0)
 
 #e2<-rasterize(occ,predictors[[1]],field=1,fun="count",background=0)
 #raw<-rasterize(occ,rp[["sbias"]],field=1,fun="count",background=0)/rp[["sbias"]]
 
+#save.image("/data/predictors_sdm/inat_sdm.RData")
+#load("/data/predictors_sdm/inat_sdm.RData")
+
 #################################################
 #################################################
 
-
-species<-c("Juglans cinerea")
-f<-function(i){as.integer(any(i==sp))}
-
-init<-vector(mode="list",length=length(species)*2)
-ninit<-1
-
-for(j in 1:length(species)){
-########################
-########################
-sp<-species[j]
-occ<-s[s$species==sp,]  
-occsp<-as(occ,"Spatial")
-  
 region<-st_buffer(concaveman(st_cast(q,"MULTIPOINT"),concavity=2),100)
-domain<-st_coordinates(st_cast(region,"MULTIPOINT"))[,1:2]
 region<-as(region,"Spatial")
+region<-spTransform(region,crs(e)) ### added after for crs problem not sure if it works
+#domain<-st_coordinates(st_cast(region,"MULTIPOINT"))[,1:2]
+domain<-st_coordinates(st_cast(st_as_sf(region),"MULTIPOINT"))[,1:2]
 
 pedge<-0.01
 edge<-min(c(diff(bbox(region)[0.2,])*pedge,diff(bbox(region)[2,])*pedge))
 edge
-
-#vars<-c("tmean","tmean2","latitude","latitude2","prec","builtup","cultivated","conifers","forested")
-#vars<-c("tmax","builtup")
-#vars<-c("1")
-#vars<-c("tmax","tmax2","trange","builtup","forested")
-vars<-c("tmax","tmax2","forested","builtup","prec","prec2")
-#vars<-names(predictors)
-r<-stack(rp[[names(rp)[names(rp)%in%c(vars,"sbias")]]])
-
-bpriors<-list(prec=list(default=1/(10)^2,latitude=1/(10)^2,latitude2=1/(10)^2,Intercept=1/(100)^2,sbias=1/(100)^2),mean=list(default=0,Intercept=0,latitude=0,latitude2=0,sbias=0))
 
 Mesh <- inla.mesh.2d(loc.domain = domain, #coordinates(occsp),
                      max.edge = c(edge,edge*1.5),
@@ -87,33 +88,124 @@ Mesh <- inla.mesh.2d(loc.domain = domain, #coordinates(occsp),
                      offset = c(edge,edge*2),
                      crs = crs(region))
 
+bpriors<-list(prec=list(default=1/(10)^2,barren=1/(10)^2,harsh=1/(10)^2,latitude=1/(10)^2,latitude2=1/(10)^2,Intercept=1/(100)^2,sbias=1/(100)^2),mean=list(default=0,Intercept=0,barren=0,harsh=0,latitude=-2,latitude2=0,sbias=0))
+
+dummy<-setValues(predictors[[1:2]],runif(2*ncell(predictors[[1]])))
+names(dummy)<-c("dummy1","dummy2")
+predictors<-stack(predictors,dummy)
+
+#vars<-c("tmean","tmean2","latitude","latitude2","prec","builtup","cultivated","conifers","forested")
+#vars<-c("tmax","builtup")
+#vars<-c("1")
+#vars<-c("tmax","tmax2","trange","builtup","forested")
+#vars<-c("tmax","tmax2","forested","forested2","conifers","conifers2","builtup","builtup2","prec","prec2","truggedness","truggedness2")
+#vars<-c("tmax","tmax2","forested","forested2","latitude","latitude2","barren","barren2","latitude:longitude","latitude2:longitude")
+#vars<-c("tmax","tmax2","forested","forested2","barren")
+#vars<-c("tmax","tmax2","forested","forested2","latitude","latitude2","barren")
+#vars<-c("tmax","tmax2","forested","forested2","latitude","conifers","conifers2","builtup","harsh","truggedness")
+#vars<-c("tmax","tmax2","conifers","conifers2","harsh","builtup")
+#vars<-c("tmax","tmax2","forested","forested2","latitude")
+#vars<-c("tmax","tmax2","latitude","latitude2","barren")
+#vars<-c("tmax","tmax2")
+#vars<-c("tmax")
+vars<-c("dummy1","dummy2")
+#vars<-c("conifers","conifers2")
+#vars<-c("latitude","latitude2") # problem with latitude????
+#vars<-c("barren")
+#vars<-names(predictors)
+f<-formula(paste("y~",paste(vars,collapse="+")))
+
+
+
+##############################################
+##############################################
+
+#species<-c("Acer saccharum")
+#species<-c("Acer saccharum","Acer saccharinum","Acer rubrum","Fraxinus nigra","Fraxinus americana","Fraxinus pennsylvanica","Populus balsamifera","Populus deltoides","Populus tremuloides","Populus grandidentata","Pinus banksiana","Pinus strobus","Picea mariana","Abies balsamea","Larix laricina")
+species<-c("Pinus banksiana","Picea mariana","Abies balsamea","Larix laricina","Tilia americana")
+species<-c("Picea mariana")
+#species<-c("Agelaius phoeniceus","Cardinalis cardinalis","Turdus migratorius","Zenaida macroura")
+#species<-c("Alces alces","Chelydra serpentina","Castor canadensis","Lepus americanus","Neovison vison")
+#species<-c("Tamiasciurus hudsonicus")
+#species<-names(rev(sort(table(s$species[s$phylum=="Tracheophyta"]))))[1:11]
+#species<-names(rev(sort(table(s$species[s$class%in%c("Reptilia","Amphibia") & s$stateProvince=="Québec"]))))[1:20]
+#species<-names(rev(sort(table(s$species[s$genus%in%c("Setophaga","Catharus") & s$stateProvince=="Québec"]))))[1:20]
+#species<-names(rev(sort(table(s$species[s$class%in%c("Actinopterygii") & s$stateProvince=="Québec"]))))[1:20]
+#species<-names(rev(sort(table(s$species[s$stateProvince=="Québec"]))))[1:21][-1]
+#species<-names(rev(sort(table(s$species[s$class%in%c("Mammalia") & s$stateProvince=="Québec"]))))[1:20]
+#species<-names(rev(sort(table(s$species))))[1:11]
+#f<-function(i){as.integer(any(i==sp))}
+init<-vector(mode="list",length=length(species)*2)
+ninit<-1
+
+loccs<-lapply(species,function(x){
+  occ<-s[s$species==x,]  
+  occsp<-as(occ,"Spatial")
+})
+names(loccs)<-species
+
+cl<-makeCluster(min(5,length(species)))
+registerDoParallel(cl)
+foreach(j=1:length(loccs),
+  .packages=c("INLA","mapSpecies","raster","sp","exactextractr","scales","concaveman")
+  #.export=c("loccs","explana","weight","bpriors","f","r","q","predictors")
+) %do% {
+
+#occs<-st_as_sf(loccs[[j]])
+#occs<-st_transform(occs,st_crs(r))
+
+sp<-names(loccs)[j] 
+occsp<-loccs[[j]]
+occs<-st_as_sf(occsp)
+
+eoccs<-rasterize(occs,predictors[[1]],field=1,fun="count",background=0)
+eoccs<-setValues(eoccs,as.integer(values(eoccs)>0))
+vals<-values(e)*rescale(values(eoccs/especies),to=c(1,max(values(especies))^0))
+vals<-ifelse(is.nan(vals) | is.infinite(vals),0,vals)
+esp<-setValues(e,vals)
+
+bdist<-500
+buff<-st_buffer(concaveman(st_as_sf(st_cast(st_union(occs),"MULTIPOINT"),concavity=2)),bdist)
+add<-mask(esp,buff,inverse=TRUE)
+add[values(add)==0]<-1
+add<-mask(add,q[q$NAME_0=="Canada" | q$NAME_1=="Alaska",])
+add[is.na(add)]<-0
+esp<-esp+add
+
+names(esp)<-"sbias"
+rp<-stack(predictors,esp)#/10000)
+
+r<-stack(rp[[names(rp)[names(rp)%in%c(vars,"sbias")]]])
+#r<-aggregate(r,3)
+
 explana<-explanaMesh(sPoly=region,mesh=Mesh,X=r)
 
 weight <- ppWeight(sPoly = region, mesh = Mesh)
-
-f<-formula(paste("y~",paste(vars,collapse="+")))
+  
 mpp <- ppSpace(f, sPoints = occsp,
                explanaMesh = explana,
                ppWeight = weight,
-               prior.range = c(100,0.01),
-               prior.sigma = c(0.1,0.01),
-               num.threads=7,
+               prior.range = c(100,0.1),
+               prior.sigma = c(0.1,0.1),
+               num.threads=2,
                many=TRUE,
                control.inla = list(int.strategy = "eb"),
                fix = NULL,
                sboffset = "sbias",
-               control.fixed = bpriors
+               control.fixed = bpriors,
+               verbose = TRUE
 )
 
 colo<-colorRampPalette(c("grey90","steelblue","steelblue2","gold2","tomato2","red4"))(200)
 
+png(paste0("/data/sdm_rbq/plots/","zzzzzz",gsub(" ","_",sp),"_eff.png"),units="in",width=10,height=8,res=100)
 m<-list(mpp=mpp)
-par(mfrow=n2mfrow(length(m)),mar=c(3,3,3,7))
+par(mfrow=n2mfrow(length(m)),mar=c(0,0,0,4))
 for(i in 1:length(m)){
-  mapMean<-mapSpace(m[[i]],dims=dim(r)[1:2],type="mean",sPoly=as(q,"Spatial"))
+  mapMean<-mapSpace(m[[i]],dims=c(1,2)*dim(r)[1:2],type="mean",sPoly=as(q,"Spatial"))
   #mapMean <- mask(mapMean,q[q$NAME_1=="Québec",]) #spacePoly
   mapMean <- mask(mapMean,q) #spacePoly
-  buff<-st_as_sf(st_buffer(st_convex_hull(st_union(occ)),dist=500))
+  buff<-st_as_sf(st_buffer(st_convex_hull(st_union(occs)),dist=1000))
   mapMean <- mask(mapMean,buff) #spacePoly
   water<-predictors[["water"]]
   water[water<0.99]<-NA
@@ -124,17 +216,21 @@ for(i in 1:length(m)){
   ninit<-ninit+1
   plot(buff,border=FALSE)
   plot(mapMean,add=TRUE, col = colo, axes = TRUE, box = FALSE, main = paste(names(m)[i],sp,sep=" - "))#,xlim=c(-1100,-900),ylim=c(200,300))
-  #points(pressp,pch=16,col=alpha("forestgreen",0.99),cex=0.2)
-  points(occsp,pch=16,col=alpha("black",0.95),cex=0.6)
+  points(occsp,pch=1,col=alpha("black",0.45),cex=0.4)
   plot(st_geometry(q),add=TRUE,border=gray(0,0.15))
   ### contour
   ID<-inla.stack.index(attributes(m[[i]])$Stack,tag="est")$data
   #contour(mapMean,levels=quantile(m[[i]]$summary.fitted.values[["mean"]][ID],0.05),add=TRUE,col="red")
-  lim<-rasterToContour(mapMean,levels=max(values(mapMean),na.rm=TRUE)*0.07)
-  plot(lim,add=TRUE,col=alpha("steelblue",0.35),lwd=2)
+  lim<-rasterToContour(mapMean,levels=max(values(mapMean),na.rm=TRUE)*0.13)
+  plot(lim,add=TRUE,col=alpha("black",0.65),lwd=1)
+  crs(mapMean)<-crs(occsp)
+  mtext(side=3,line=-5,adj=0.9,text=paste(sp,""),font=2,cex=1.4,col=gray(0,0.3))
+  writeRaster(mapMean, filename=paste0("/data/sdm_rbq/rasters/",gsub(" ","_",sp),".tif"), format="GTiff", overwrite=TRUE)
 }
 par(mfrow=c(1,1))
+dev.off()
 
+print(j)
 }
 
 
@@ -179,4 +275,174 @@ raw[raw<0.5]<-NA
 raw<-rasterToPolygons(raw,na.rm=TRUE)
 points(coordinates(raw)[,1],coordinates(raw)[,2],pch=1,cex=1,col="white")
 plot(Mesh,add=TRUE,col=gray(0,0.9))
+
+install.packages("/data/atlasBE", repos = NULL, type = "source")
+
+install.packages("RPostgres")
+
+
+
+
+
+inla.mesh2sp <- function(mesh) {
+	crs <- inla.CRS(inla.CRSargs(mesh$crs))
+	isgeocentric <- identical(inla.as.list.CRS(crs)[["proj"]], "geocent")
+	if (isgeocentric || (mesh$manifold == "S2")) {
+		stop(paste0(
+			"'sp' doesn't support storing polygons in geocentric coordinates.\n",
+			"Convert to a map projection with inla.spTransform() before
+calling inla.mesh2sp()."))
+	}
+	
+	triangles <- SpatialPolygonsDataFrame(
+		Sr = SpatialPolygons(lapply(
+			1:nrow(mesh$graph$tv),
+			function(x) {
+				tv <- mesh$graph$tv[x, , drop = TRUE]
+				Polygons(list(Polygon(mesh$loc[tv[c(1, 3, 2, 1)],
+																																			1:2,
+																																			drop = FALSE])),
+													ID = x)
+			}
+		),
+		proj4string = crs
+		),
+		data = as.data.frame(mesh$graph$tv[, c(1, 3, 2), drop = FALSE]),
+		match.ID = FALSE
+	)
+	vertices <- SpatialPoints(mesh$loc[, 1:2, drop = FALSE], proj4string = crs)
+	
+	list(triangles = triangles, vertices = vertices)
+}
+
+
+
+quebec<-readRDS("/data/predictors_sdm/worldclim/gadm36_CAN_1_sp.rds")
+quebec<-quebec[quebec$NAME_1=="Québec",]
+quebec<-st_as_sf(quebec)
+quebec<-st_transform(quebec,prj)
+quebec<-ms_simplify(quebec,keep=0.005)
+
+mesh<-inla.mesh2sp(Mesh)
+occs<-st_as_sf(loccs[[1]])
+mesh<-st_as_sf(mesh$triangles)
+r<-rp[["sbias"]]
+occs<-st_transform(occs,st_crs(r))
+
+e<-exact_extract(r,mesh)
+
+mesh$effort<-sapply(e,function(i){
+  sum(i[,1]*i[,2])	
+})
+
+plot(mesh["effort"])
+
+o<-st_intersects(mesh,occs)
+
+mesh$nobs<-lengths(o)
+mesh$ratio<-mesh$nobs/mesh$effort
+mesh$ratio<-ifelse(is.nan(mesh$ratio),NA,mesh$ratio)
+mesh$cols<-colo.scale(mesh$ratio,cols=c("grey90","gold2","orange","red","red4"))
+#mesh$cols<-colo.scale(sqrt(mesh$nobs),cols=c("grey90","gold2","orange","red","red4"))
+mesh2<-st_crop(mesh,quebec)
+#mesh2<-mesh
+
+png(paste0("/data/sdm_rbq/plots/",gsub(" ","_",sp),"_effort.png"),units="in",width=10,height=10,res=300)
+plot(st_geometry(mesh2),col=mesh2$cols,border=gray(0,0.2))
+plot(st_geometry(quebec),add=TRUE,border="black",lwd=5)
+plot(st_geometry(occs),add=TRUE,col=alpha("forestgreen",0.2),pch=16,cex=0.6)
+dev.off()
+
+
+#png(paste0("/data/sdm_rbq/plots/",gsub(" ","_",sp),"_effort.png"),units="in",width=10,height=10,res=300)
+#plot(mesh2["effort"])
+#plot(st_geometry(quebec),add=TRUE,border="black",lwd=5)
+#plot(st_geometry(occs),add=TRUE,col=alpha("forestgreen",0.2),pch=16,cex=0.6)
+#dev.off()
+
+meshsf<-st_as_sf(mesh)
+meshsf$tri<-1:nrow(meshsf)
+w<-st_intersects(s,meshsf)
+s$tri<-unlist(w)
+trisp<-unique(as.data.table(s[,c("species","tri")])[,geometry:=NULL])
+trisp<-trisp[,.(nsp=.N),by="tri"]
+meshsf<-left_join(meshsf,trisp)
+w<-st_intersects(meshsf,occs)
+meshsf$pres<-as.integer(lengths(w)>0)
+meshsf$prop<-meshsf$pres/meshsf$nsp
+#meshsf2<-st_crop(meshsf,quebec)
+meshsf2<-meshsf
+meshsf2$cols<-colo.scale(meshsf2$prop,cols=c("grey90","gold2","orange","red","red4"),re=TRUE)
+
+png(paste0("/data/sdm_rbq/plots/",gsub(" ","_",sp),"_prop.png"),units="in",width=10,height=10,res=300)
+plot(st_geometry(meshsf2),col=meshsf2$cols)
+plot(st_geometry(quebec),add=TRUE,border="black",lwd=5)
+plot(st_geometry(occs),add=TRUE,col=alpha("forestgreen",0.2),pch=16,cex=0.6)
+dev.off()
+
+
+
+png(paste0("/data/sdm_rbq/plots/zzzz.png"),units="in",width=10,height=10,res=300,pointsize=10)
+#plot(st_geometry(meshsf),lwd=0.1)
+#plot(st_geometry(quebec),add=TRUE,border="black",lwd=1)
+plot(aggregate(predictors[["harsh"]],13))
+plot(st_geometry(meshsf),add=TRUE,lwd=0.1)
+dev.off()
+
+
+
+
+png(paste0("/data/sdm_rbq/plots/zzzz.png"),units="in",width=10,height=10,res=300)
+#plot(e2)
+plot(crop(e4,quebec))
+plot(st_geometry(quebec),add=TRUE,border="black",lwd=1)
+dev.off()
+
+
+png(paste0("/data/sdm_rbq/plots/zzzz.png"),units="in",width=10,height=10,res=300)
+h<-hist(values(esp),breaks=seq(0,16000,by=500),xlim=c(200,15000))
+dev.off()
+
+
+
+
+
+png(paste0("/data/sdm_rbq/plots/","zzzzzz.png"),units="in",width=24,height=12,res=200)
+par(mfrow=c(2,4),mar=c(3,3,2,5))
+xlim<-range(st_bbox(q)[c(1,3)])
+ylim<-range(st_bbox(q)[c(2,4)])
+proj<-inla.mesh.projector(Mesh,xlim=xlim,ylim=ylim,dims=c(300,300))
+mfield<-inla.mesh.project(projector=proj,field=mpp$summary.random[['i']][['mean']])
+sdfield<-inla.mesh.project(projector=proj,field=mpp$summary.random[['i']][['sd']])
+image.plot(list(x=proj$x,y=proj$y,z=mfield),col=viridis(100),asp=1,main="Spatial field (log scale)") 
+axis(1)
+axis(2)
+plot(st_geometry(q),add=TRUE,border=gray(0,0.5))
+image.plot(list(x=proj$x,y=proj$y,z=sdfield),col=viridis(100),asp=1,main="sd of spatial field (log scale)") 
+axis(1)
+axis(2)
+plot(st_geometry(q),add=TRUE,border=gray(0,0.5))
+mean1<-rasterFromXYZ(cbind(as.matrix(expand.grid(x=proj$x,y=proj$y)),z=as.vector(mfield)),crs=crs(mapMean))
+mean2<-resample(mean1,mapMean)
+sd1<-rasterFromXYZ(cbind(as.matrix(expand.grid(x=proj$x,y=proj$y)),z=as.vector(sdfield)),crs=crs(mapMean))
+sd2<-resample(sd1,mapMean)
+plot(mapMean)
+plot(exp(log(mapMean)-mean2))
+plot(mask(mean2,q),col=colo.scale(seq(min(values(mean2),na.rm=TRUE),max(values(mean2),na.rm=TRUE),length.out=100),c("darkblue","blue","white","red","darkred"),center=TRUE))
+plot(mask(sd2,q))
+buff<-st_buffer(concaveman(st_as_sf(st_cast(st_union(occs),"MULTIPOINT"),concavity=2)),bdist)
+plot(log(esp))
+plot(st_geometry(q),add=TRUE)
+plot(st_geometry(buff),add=TRUE)
+plot(st_geometry(occs),cex=0.6,pch=1,col=alpha("black",0.5),add=TRUE)
+add<-mask(esp,buff,inverse=TRUE)
+add[values(add)==0]<-1
+add<-mask(add,q[q$NAME_0=="Canada" | q$NAME_1=="Alaska",])
+add[is.na(add)]<-0
+plot(log(esp))
+dev.off()
+
+
+
+
 

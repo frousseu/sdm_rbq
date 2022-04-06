@@ -54,6 +54,8 @@ params<-lapply(params,function(i){rep(i,length.out=max(sapply(params,length)))})
 
 #layout(matrix(seq_len(5*length(params[[1]])),nrow=5,byrow=FALSE))
 
+png("plots.png")
+
 par(mfcol=c(length(params[[1]]),5),oma=c(0,4,0,3),mar=c(1,1,1,1))
 
 for(k in seq_along(params[[1]])){
@@ -180,3 +182,4 @@ for(k in seq_along(params[[1]])){
   
 }
 
+dev.off()

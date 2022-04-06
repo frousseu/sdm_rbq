@@ -13,11 +13,14 @@ library(mapSpecies)
 
 colo<-colorRampPalette(c("grey90","steelblue4","steelblue2","gold","red1","red4"))(200)
 prj<-"+proj=lcc +lat_0=47 +lon_0=-75 +lat_1=49 +lat_2=77 +x_0=0 +y_0=0 +datum=NAD83 +units=km +no_defs"
+#prj<-"+proj=lcc +lat_0=47 +lon_0=-75 +lat_1=49 +lat_2=77 +x_0=0 +y_0=0 +units=km +no_defs"
 
 ###################################################
 ### Québec 
 q1<-raster:::getData('GADM', country='CAN', level=1)
 q2<-raster:::getData('GADM', country='USA', level=1)
+q1<-readRDS("/data/predictors_sdm/worldclim/gadm36_CAN_1_sp.rds")
+q2<-readRDS("/data/predictors_sdm/worldclim/gadm36_USA_1_sp.rds")
 q<-rbind(q1,q2)
 q<-st_as_sf(q)
 q<-st_transform(q,prj)
@@ -61,6 +64,10 @@ l<-lapply(seq_along(lon),function(i){
   x<-raster::getData('worldclim',var='bio',res=0.5,lon=lon[i],lat=lat[i])
   x[[c(1,5,7,12)]]
 })
+#l<-list.files("predictors_sdm/wc0.5",pattern=".hdr|bio1|bio5|bio7|bio12")
+#l<-list.files("predictors_sdm/wc0.5",pattern=".bil",full.names=TRUE)
+#vs<-c("bio1","bio5","bio7","bio12")
+#l<-lapply(l,raster)
 WC<-do.call("merge",l)
 wc<-WC
 k<-c("tmean","tmax","trange","prec")
@@ -77,7 +84,10 @@ for(i in k){
 
 ###################################################
 ### Earth Env data
+# https://data.earthenv.org/consensus_landcover/without_DISCover/Consensus_reduced_class_11.tif
+
 path<-"C:/Users/rouf1703/Documents/UdeS/Programmation/mapSpecies/earthenv/landcover"
+path<-"/data/predictors_sdm/earthenv/landcover"
 list.files(path)
 
 ext<-extent(-105,-50,40,84)
@@ -86,8 +96,13 @@ habitats<-list(
   conifers=1,
   broadleafs=3,
   mixed=4,
+  shrubs=5,
+  herbaceous=6,
   cultivated=7,
+  flooded=8,
   builtup=9,
+  ice=10,
+  barren=11,
   water=12
 )
 
@@ -96,14 +111,17 @@ lc<-stack(list.files(path,full.names=TRUE))
 lc<-crop(lc,as.vector(bb)[c(1,3,2,4)])
 lc<-aggregate(lc,2)
 names(lc)<-names(habitats)[match(names(lc),paste0("Consensus_reduced_class_",unlist(habitats)))]
-k<-c("water","cultivated","builtup","conifers","broadleafs","mixed")
+k<-names(habitats)
 lc<-lc[[k]]
 forested<-sum(lc[[c("conifers","broadleafs","mixed")]])
 names(forested)<-"forested"
-lc<-stack(lc,forested)
+harsh<-sum(lc[[c("barren","ice")]])
+names(harsh)<-"harsh"
+lc<-stack(lc,forested,harsh)
 
 # terrain
 tri<-raster("C:/Users/rouf1703/Documents/UdeS/Programmation/mapSpecies/earthenv/terrain/tri_1KMmd_GMTEDmd.tif")
+tri<-raster("/data/predictors_sdm/earthenv/terrain/tri_1KMmd_GMTEDmd.tif")
 tri<-crop(tri,as.vector(bb)[c(1,3,2,4)])
 tri<-aggregate(tri,2)
 names(tri)<-"truggedness"
@@ -142,9 +160,28 @@ int<-lapply(int,function(i){
   ras
 })
 predictors<-stack(predictors,stack(int))
+int<-names(predictors)[names(predictors)%in%c("latitude","latitude2")]
+int<-lapply(int,function(i){
+  ras<-predictors[["longitude"]]*predictors[[i]]
+  names(ras)<-paste0("longitude",":",i)
+  ras
+})
+predictors<-stack(predictors,stack(int))
 
 
 ##########################################################
 ### delete unnecessary objects
 rm(list=ls()[!ls()%in%c("prj","colo","predictors","q","watermask")])
 gc()
+
+#save.image("/data/predictors_sdm/predictors.RData")
+
+####################################################
+####################################################
+### viz
+
+#png("/data/sdm_rbq/plots/zpredictors.png",units="in",width=10,height=8,res=75)
+#plot(explana$X)#[[c("latitude")]])
+#plot(mapMean)
+#attributes(mpp)$X
+#dev.off()
