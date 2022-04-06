@@ -1,4 +1,5 @@
 
+
 library(mapSpecies)
 library(sf)
 library(data.table)
@@ -9,7 +10,6 @@ library(raster)
 ########################
 
 r<-stack(predictors[[names(predictors)[names(predictors)%in%c("tmean","tmean2","broadleafs","broadleafs2","sbias")]]])
-
 
 
 bpriors<-list(prec=list(default=1/(0.3)^2,latitude=1/(10)^2,latitude2=1/(10)^2,Intercept=1/(100)^2,sbias=1/(100)^2),mean=list(default=0,Intercept=0,latitude=0,latitude2=0,sbias=0))

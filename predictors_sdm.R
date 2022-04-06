@@ -10,7 +10,6 @@ library(RandomFields)
 library(sf)
 library(mapSpecies)
 
-
 colo<-colorRampPalette(c("grey90","steelblue4","steelblue2","gold","red1","red4"))(200)
 prj<-"+proj=lcc +lat_0=47 +lon_0=-75 +lat_1=49 +lat_2=77 +x_0=0 +y_0=0 +datum=NAD83 +units=km +no_defs"
 #prj<-"+proj=lcc +lat_0=47 +lon_0=-75 +lat_1=49 +lat_2=77 +x_0=0 +y_0=0 +units=km +no_defs"
