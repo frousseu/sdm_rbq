@@ -9,6 +9,7 @@ library(raster)
 library(RandomFields)
 library(sf)
 library(mapSpecies)
+library(terra)
 
 colo<-colorRampPalette(c("grey90","steelblue4","steelblue2","gold","red1","red4"))(200)
 prj<-"+proj=lcc +lat_0=47 +lon_0=-75 +lat_1=49 +lat_2=77 +x_0=0 +y_0=0 +datum=NAD83 +units=km +no_defs"
@@ -16,25 +17,28 @@ prj<-"+proj=lcc +lat_0=47 +lon_0=-75 +lat_1=49 +lat_2=77 +x_0=0 +y_0=0 +datum=NA
 
 ###################################################
 ### Québec 
-q1<-raster:::getData('GADM', country='CAN', level=1)
-q2<-raster:::getData('GADM', country='USA', level=1)
-q1<-readRDS("/data/predictors_sdm/worldclim/gadm36_CAN_1_sp.rds")
-q2<-readRDS("/data/predictors_sdm/worldclim/gadm36_USA_1_sp.rds")
-q<-rbind(q1,q2)
-q<-st_as_sf(q)
-q<-st_transform(q,prj)
-q<-ms_simplify(q,keep=0.005)
+can<-raster:::getData('GADM', country='CAN', level=1)
+usa<-raster:::getData('GADM', country='USA', level=1)
+can<-readRDS("/data/predictors_sdm/worldclim/gadm36_CAN_1_sp.rds")
+usa<-readRDS("/data/predictors_sdm/worldclim/gadm36_USA_1_sp.rds")
+na<-rbind(can,usa)
+na<-st_as_sf(na)
+na<-st_transform(na,prj)
+na<-ms_simplify(na,keep=0.005)
+st_write(na,"/data/predictors_sdm/na.shp")
+
 
 
 ####################################################################
 ### raster of predictors and extent of study region
 #ext<-extent(-2000,2000,-1000,3500)
-#ext<-extent(as.vector(st_bbox(q)))
-ext<-extent(-4500,2000,-2700,4600) # North America
-rp<-raster(ext,resolution=c(5,5),crs=prj)
-q<-st_crop(q,ext)
-bb<-st_bbox(st_transform(q,4326))
-plot(st_geometry(q))
+#ext<-extent(as.vector(st_bbox(na)))
+ext<-ext(c(-4500,2000,-2700,4600)) # North America
+#rp<-raster(ext,resolution=c(5,5),crs=prj)
+rp<-rast(ext,resolution=c(5,5),crs=prj)
+na<-st_crop(na,ext)
+bb<-st_bbox(st_transform(na,4326))
+plot(st_geometry(na))
 
 
 
@@ -52,34 +56,50 @@ plot(st_geometry(q))
 
 ##################################################
 ### WorldClim
-#lon<-c(-105,-80,-55,-80,-105)
-#lat<-c(45,45,45,70,70)
-lon<-seq(bb[1],bb[3],length.out=5)
-lat<-seq(bb[2],bb[4],length.out=3)
-eg<-expand.grid(lon,lat)
-lon<-eg[,1]
-lat<-eg[,2]
-l<-lapply(seq_along(lon),function(i){
-  x<-raster::getData('worldclim',var='bio',res=0.5,lon=lon[i],lat=lat[i])
-  x[[c(1,5,7,12)]]
+##lon<-c(-105,-80,-55,-80,-105)
+##lat<-c(45,45,45,70,70)
+#lon<-seq(bb[1],bb[3],length.out=5)
+#lat<-seq(bb[2],bb[4],length.out=3)
+#eg<-expand.grid(lon,lat)
+#lon<-eg[,1]
+#lat<-eg[,2]
+#l<-lapply(seq_along(lon),function(i){
+#  x<-raster::getData('worldclim',var='bio',res=0.5,lon=lon[i],lat=lat[i],path="../predictors_sdm/wc0.5")
+#  x[[c(1,5,7,12)]]
+#})
+
+l<-list.files("../predictors_sdm/wc0.5",pattern=".bil",full.names=TRUE)
+vs<-c("bio1_","bio5_","bio7_","bio12_")
+l<-l[grep(paste(vs,collapse="|"),l)]
+l<-split(l,sapply(strsplit(l,"_"),"[",2))
+wc<-lapply(l,function(i){
+  r<-lapply(i,function(j){
+    rast(j)
+  })
+  do.call("merge",r)
 })
-#l<-list.files("predictors_sdm/wc0.5",pattern=".hdr|bio1|bio5|bio7|bio12")
-#l<-list.files("predictors_sdm/wc0.5",pattern=".bil",full.names=TRUE)
-#vs<-c("bio1","bio5","bio7","bio12")
-#l<-lapply(l,raster)
-WC<-do.call("merge",l)
-wc<-WC
-k<-c("tmean","tmax","trange","prec")
+wc<-rast(wc)
+#l<-lapply(l,rast)
+#WC<-do.call("merge",l[1:200])
+#wc<-WC
+k<-c("tmean","prec","tmax","trange")
 names(wc)<-k
-wc<-projectRaster(wc,rp)
-wc<-resample(wc,rp)
+#wc<-projectRaster(wc,rp)
+wc<-project(wc,rp)
+#wc<-resample(wc,rast(rp))
 wc[[1]]<-wc[[1]]/10
-wc[[2]]<-wc[[2]]/10
+wc[[2]]<-wc[[2]]/1000
 wc[[3]]<-wc[[3]]/10
-wc[[4]]<-wc[[4]]/1000
+wc[[4]]<-wc[[4]]/10
+#for(i in k){
+#  wc[[i]]<-focal(wc[[i]],w=matrix(1,21,21),fun=mean,na.rm=TRUE,NAonly=TRUE)
+#}
 for(i in k){
-  wc[[i]]<-focal(wc[[i]],w=matrix(1,21,21),fun=mean,na.rm=TRUE,NAonly=TRUE)
+  wc[[i]]<-focal(wc[[i]],w=matrix(1,21,21),fun=mean,na.rm=TRUE,na.policy="only")
 }
+#png("/data/sdm_rbq/graphics/wc.png",width=12,height=10,res=200,units="in")
+#plot(wc)
+#dev.off()
 
 ###################################################
 ### Earth Env data
@@ -106,8 +126,8 @@ habitats<-list(
 )
 
 # landcover
-lc<-stack(list.files(path,full.names=TRUE))
-lc<-crop(lc,as.vector(bb)[c(1,3,2,4)])
+lc<-rast(list.files(path,full.names=TRUE))
+lc<-crop(lc,ext(bb[c(1,3,2,4)]))
 lc<-aggregate(lc,2)
 names(lc)<-names(habitats)[match(names(lc),paste0("Consensus_reduced_class_",unlist(habitats)))]
 k<-names(habitats)
@@ -116,61 +136,77 @@ forested<-sum(lc[[c("conifers","broadleafs","mixed")]])
 names(forested)<-"forested"
 harsh<-sum(lc[[c("barren","ice")]])
 names(harsh)<-"harsh"
-lc<-stack(lc,forested,harsh)
+lc<-c(lc,forested,harsh)
 
 # terrain
-tri<-raster("C:/Users/rouf1703/Documents/UdeS/Programmation/mapSpecies/earthenv/terrain/tri_1KMmd_GMTEDmd.tif")
-tri<-raster("/data/predictors_sdm/earthenv/terrain/tri_1KMmd_GMTEDmd.tif")
-tri<-crop(tri,as.vector(bb)[c(1,3,2,4)])
+#tri<-rast("C:/Users/rouf1703/Documents/UdeS/Programmation/mapSpecies/earthenv/terrain/tri_1KMmd_GMTEDmd.tif")
+tri<-rast("/data/predictors_sdm/earthenv/terrain/tri_1KMmd_GMTEDmd.tif")
+tri<-crop(tri,ext(bb[c(1,3,2,4)]))
 tri<-aggregate(tri,2)
 names(tri)<-"truggedness"
 
 # stack ee
-ee<-stack(lc,tri)/100
-ee<-projectRaster(ee,rp)
-ee<-resample(ee,rp)
+ee<-c(lc,tri)/100
+ee<-project(ee,rp)
+#ee<-resample(ee,rp)
 
 # watermask
 wm<-ee[["water"]]
 wm[wm<0.999]<-NA
-wm<-polygonize(wm)
+wm<-polygonize(raster(wm))
 watermask<-st_as_sf(st_union(wm))
+st_write(watermask,"/data/predictors_sdm/watermask.shp")
 
 ###################################################
 ### Latitude
 
-lat<-stack(rp,rp)
-lat<-setValues(lat,coordinates(lat)[,1:2])
+lat<-c(rp,rp)
+#lat<-setValues(lat,1:ncell(lat))
+lat<-setValues(lat,xyFromCell(lat,1:ncell(lat))[,1:2])
 names(lat)<-c("longitude","latitude")
 
 ### Stack all
-predictors<-stack(wc,ee,lat)
-moytemp<-mean(values(wc$tmean),na.rm=TRUE)
-sdtemp<-sd(values(wc$tmean),na.rm=TRUE)
+predictors<-c(wc,ee,lat)
+png("/data/sdm_rbq/graphics/predictors.png",width=16,height=12,res=200,units="in")
+plot(predictors,maxnl=100)
+dev.off()
+#moytemp<-mean(values(wc$tmean),na.rm=TRUE)
+#sdtemp<-sd(values(wc$tmean),na.rm=TRUE)
+
+### extend to cover future mesh
+#k<-names(predictors)
+#for(i in k){
+#  predictors[[i]]<-focal(predictors[[i]],w=matrix(1,21,21),fun=mean,na.rm=TRUE,na.policy="only")
+#}
+#png("/data/sdm_rbq/graphics/wc.png",width=12,height=10,res=200,units="in")
+#plot(wc)
+#dev.off()
+
 predictors<-scale(predictors)
 npredictors<-names(predictors)
-predictors<-stack(predictors,predictors^2)
+predictors<-c(predictors,predictors^2)
 names(predictors)<-c(npredictors,paste0(npredictors,2))
 predictors<-predictors[[order(names(predictors))]]
 int<-names(predictors)[!names(predictors)%in%c("latitude","latitude2","prec","prec2","tmean","tmean2","sbias")]
 int<-lapply(int,function(i){
   ras<-predictors[["latitude"]]*predictors[[i]]
-  names(ras)<-paste0("latitude",":",i)
+  names(ras)<-paste0("latitude","_",i)
   ras
 })
-predictors<-stack(predictors,stack(int))
+predictors<-c(predictors,rast(int))
 int<-names(predictors)[names(predictors)%in%c("latitude","latitude2")]
 int<-lapply(int,function(i){
   ras<-predictors[["longitude"]]*predictors[[i]]
-  names(ras)<-paste0("longitude",":",i)
+  names(ras)<-paste0("longitude","_",i)
   ras
 })
-predictors<-stack(predictors,stack(int))
+predictors<-c(predictors,rast(int))
+writeRaster(predictors,"/data/predictors_sdm/predictors.tif",overwrite=TRUE)
 
 
 ##########################################################
 ### delete unnecessary objects
-rm(list=ls()[!ls()%in%c("prj","colo","predictors","q","watermask")])
+rm(list=ls()[!ls()%in%c("prj","colo","predictors","na","watermask")])
 gc()
 
 #save.image("/data/predictors_sdm/predictors.RData")
