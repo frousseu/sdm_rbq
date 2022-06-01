@@ -12,7 +12,7 @@ library(mapSpecies)
 library(terra)
 
 colo<-colorRampPalette(c("grey90","steelblue4","steelblue2","gold","red1","red4"))(200)
-prj<-"+proj=lcc +lat_0=47 +lon_0=-75 +lat_1=49 +lat_2=77 +x_0=0 +y_0=0 +datum=NAD83 +units=km +no_defs"
+prj<-"+proj=lcc +lat_0=49 +lon_0=-100 +lat_1=49 +lat_2=77 +x_0=0 +y_0=0 +datum=NAD83 +units=km +no_defs"
 #prj<-"+proj=lcc +lat_0=47 +lon_0=-75 +lat_1=49 +lat_2=77 +x_0=0 +y_0=0 +units=km +no_defs"
 
 ###################################################
@@ -33,12 +33,13 @@ st_write(na,"/data/predictors_sdm/na.shp")
 ### raster of predictors and extent of study region
 #ext<-extent(-2000,2000,-1000,3500)
 #ext<-extent(as.vector(st_bbox(na)))
-ext<-ext(c(-4500,2000,-2700,4600)) # North America
+ext<-ext(c(-3500,3500,-3000,4000)) # North America
 #rp<-raster(ext,resolution=c(5,5),crs=prj)
-rp<-rast(ext,resolution=c(5,5),crs=prj)
+rp<-rast(ext,resolution=c(2,2),crs=prj)
 na<-st_crop(na,ext)
 bb<-st_bbox(st_transform(na,4326))
 plot(st_geometry(na))
+plot(ext,add=TRUE)
 
 
 
@@ -182,32 +183,14 @@ dev.off()
 #plot(wc)
 #dev.off()
 
-predictors<-scale(predictors)
-npredictors<-names(predictors)
-predictors<-c(predictors,predictors^2)
-names(predictors)<-c(npredictors,paste0(npredictors,2))
-predictors<-predictors[[order(names(predictors))]]
-int<-names(predictors)[!names(predictors)%in%c("latitude","latitude2","prec","prec2","tmean","tmean2","sbias")]
-int<-lapply(int,function(i){
-  ras<-predictors[["latitude"]]*predictors[[i]]
-  names(ras)<-paste0("latitude","_",i)
-  ras
-})
-predictors<-c(predictors,rast(int))
-int<-names(predictors)[names(predictors)%in%c("latitude","latitude2")]
-int<-lapply(int,function(i){
-  ras<-predictors[["longitude"]]*predictors[[i]]
-  names(ras)<-paste0("longitude","_",i)
-  ras
-})
-predictors<-c(predictors,rast(int))
 writeRaster(predictors,"/data/predictors_sdm/predictors.tif",overwrite=TRUE)
+
 
 
 ##########################################################
 ### delete unnecessary objects
-rm(list=ls()[!ls()%in%c("prj","colo","predictors","na","watermask")])
-gc()
+#rm(list=ls()[!ls()%in%c("prj","colo","predictors","na","watermask")])
+#gc()
 
 #save.image("/data/predictors_sdm/predictors.RData")
 
