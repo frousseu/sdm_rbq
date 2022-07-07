@@ -1,7 +1,6 @@
 
 library(scales)
 library(data.table)
-library(rgbif)
 library(rmapshaper)
 library(spex)
 library(dplyr)
@@ -25,8 +24,6 @@ na<-rbind(can,usa)
 na<-st_as_sf(na)
 na<-st_transform(na,prj)
 na<-ms_simplify(na,keep=0.005)
-st_write(na,"/data/predictors_sdm/na.shp")
-
 
 
 ####################################################################
@@ -37,6 +34,7 @@ ext<-ext(c(-3500,3500,-3000,4000)) # North America
 #rp<-raster(ext,resolution=c(5,5),crs=prj)
 rp<-rast(ext,resolution=c(2,2),crs=prj)
 na<-st_crop(na,ext)
+st_write(na,"/data/predictors_sdm/na.shp",append=FALSE)
 bb<-st_bbox(st_transform(na,4326))
 plot(st_geometry(na))
 plot(ext,add=TRUE)
@@ -140,23 +138,28 @@ names(harsh)<-"harsh"
 lc<-c(lc,forested,harsh)
 
 # terrain
-#tri<-rast("C:/Users/rouf1703/Documents/UdeS/Programmation/mapSpecies/earthenv/terrain/tri_1KMmd_GMTEDmd.tif")
 tri<-rast("/data/predictors_sdm/earthenv/terrain/tri_1KMmd_GMTEDmd.tif")
 tri<-crop(tri,ext(bb[c(1,3,2,4)]))
 tri<-aggregate(tri,2)
 names(tri)<-"truggedness"
 
+# elevation
+elev<-rast("/data/predictors_sdm/earthenv/terrain/elevation_1KMmd_GMTEDmd.tif")
+elev<-crop(elev,ext(bb[c(1,3,2,4)]))
+elev<-aggregate(elev,2)
+names(elev)<-"elevation"
+
 # stack ee
-ee<-c(lc,tri)/100
+ee<-c(c(lc,tri)/100,elev)
 ee<-project(ee,rp)
 #ee<-resample(ee,rp)
 
 # watermask
-wm<-ee[["water"]]
-wm[wm<0.999]<-NA
-wm<-polygonize(raster(wm))
-watermask<-st_as_sf(st_union(wm))
-st_write(watermask,"/data/predictors_sdm/watermask.shp")
+#wm<-ee[["water"]]
+#wm[wm<0.999]<-NA
+#wm<-polygonize(raster(wm))
+#watermask<-st_as_sf(st_union(wm))
+#st_write(watermask,"/data/predictors_sdm/watermask.shp")
 
 ###################################################
 ### Latitude
@@ -184,6 +187,76 @@ dev.off()
 #dev.off()
 
 writeRaster(predictors,"/data/predictors_sdm/predictors.tif",overwrite=TRUE)
+
+
+### Transform predictors
+
+# Do it here once it's faster than doing it before running models
+
+predictors<-rast("/data/predictors_sdm/predictors.tif")
+
+### Data transformations
+# predictors<-scale(predictors)
+# the following is the equivalent (see terra help)
+means <- global(predictors, "mean", na.rm=TRUE)
+pre <- predictors - means[,1]
+sds <- global(pre, "rms", na.rm=TRUE)
+predictors <- pre / sds[,1]
+# function to backtransform to orginal scale
+backTransform<-function(x,var){
+  m<-match(var,row.names(means))
+  me<-means[m,"mean"]
+  sd<-sds[m,"rms"]
+  (x*sd)+me
+}
+
+### add quadratic terms
+npredictors<-names(predictors)
+predictors<-c(predictors,predictors^2)
+names(predictors)<-c(npredictors,paste0(npredictors,2))
+predictors<-predictors[[order(names(predictors))]]
+
+### add interactions with latitude
+int<-names(predictors)[!names(predictors)%in%c("latitude","latitude2","prec","prec2","tmean","tmean2","sbias")]
+int<-lapply(int,function(i){
+  ras<-predictors[[i]]*predictors[["latitude"]]
+  names(ras)<-paste0(i,"_","latitude")
+  ras
+})
+predictors<-c(predictors,rast(int))
+
+### add interactions with tmean
+int<-names(predictors)[!names(predictors)%in%c("latitude","latitude2","longitude","longitude2","tmean","tmean2","sbias")]
+int<-int[-grep("_",int)]
+int<-lapply(int,function(i){
+  ras<-predictors[[i]]*predictors[[c("tmean","tmean2")]]
+  names(ras)<-paste0(i,"_",c("tmean","tmean2"))
+  ras
+})
+predictors<-c(predictors,rast(int))
+
+### add latlon interactions
+int<-names(predictors)[names(predictors)%in%c("latitude","latitude2")]
+int<-lapply(int,function(i){
+  ras<-predictors[["longitude"]]*predictors[[i]]
+  names(ras)<-paste0("longitude","_",i)
+  ras
+})
+predictors<-c(predictors,rast(int))
+
+
+### add polynomials for tmean (test)
+polys<-predictors[["tmean"]]^(3:6)
+names(polys)<-paste0("tmean",3:6)
+predictors<-c(predictors,polys)
+#predictors<-extend(predictors,ext(vect(st_buffer(na,1000))))
+#for(i in names(predictors)){
+#  predictors[[i]]<-focal(predictors[[i]],w=matrix(1,21,21),fun=mean,na.rm=TRUE,na.policy="only")
+#  print(i)
+#}
+
+writeRaster(predictors,"/data/predictors_sdm/predictors_transformed.tif",overwrite=TRUE)
+
 
 
 
