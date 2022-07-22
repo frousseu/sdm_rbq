@@ -27,6 +27,12 @@ library(mapsf)
 # grep -n 10 output.out
 # tail -n 10 output.out ; grep -n -i checkpoint output.out
 
+# find /tmp -mmin +60 -user rouf1703 -delete
+# find /tmp -mmin +60 -user rouf1703 -type d -empty -exec rmdir {} \;
+# df -h
+# ls -laht | sort -k4 | grep rouf1703
+
+inla.setOption(pardiso.license = "/home/rouf1703/pardiso.lic")
 
 checkpoint<-function(msg="",tz="Indian/Mauritius"){
   cat(paste("checkpoint",
@@ -200,6 +206,7 @@ backTransform<-function(x,var){
 
 
 predictors<-rast("/data/predictors_sdm/predictors_transformed.tif")
+#predictors<-aggregate(predictors,2)
 checkpoint("Predictor transformations done")
 
 #png("/data/sdm_rbq/graphics/extended_predictors.png",width=12,height=10,res=200,units="in")
@@ -215,6 +222,7 @@ keep<-c("kingdom","phylum","class","order","family","genus","species","countryCo
 checkpoint("Read in data")
 d<-fread("/data/predictors_sdm/inat/0212584-210914110416597.csv",encoding="UTF-8",select=keep) 
 d<-d[countryCode%in%c("US","CA"),]
+d[,.(n=.N),by=.(species,class)][n>200,][,.(n=.N),by=.(class)]
 #prov<-c("Québec","Ontario","New Brunswick","Newfoundland and Labrador","Vermont","Maine","New Hampshire","New York","Massachusetts","Nunavut","Nova Scotia")
 #prov<-c("Vermont","New Hampshire","Maine","Ontario","New York","Massachusetts","Québec","Rhode Island","Connecticut","New Brunswick","Nova Scotia")
 prov<-c("Ontario","Québec","New Brunswick")
@@ -254,7 +262,7 @@ s<-st_transform(s,st_crs(na))
 #o<-st_intersects(s,na)
 
 checkpoint("Make filter grid")
-g<-st_make_grid(na,cellsize=5)
+g<-st_make_grid(na,cellsize=10)
 checkpoint("Make grid done")
 o<-st_intersects(s,g)
 checkpoint("Intersecting done")
@@ -262,6 +270,15 @@ s$cell<-unlist(lapply(o,"[",1))
 s<-s[!is.na(s$cell),]
 s<-s[!duplicated(as.data.frame(s[,c("recordedBy","species","cell")])[,1:3]),]
 checkpoint("Make filter grid done")
+
+
+#occ<-s[s$species=="Hylocichla mustelina",]  
+#samp<-occ[sample(1:nrow(occ),10000,replace=TRUE),]
+#samp<-st_jitter(samp,fac=0.01)
+#occ<-st_join(samp,na,join=st_intersects)
+#occ<-occ[,names(s)]
+#s<-rbind(s,occ)
+
 
 #plot(st_geometry(na),border="grey85")
 #plot(st_geometry(s),pch=16,col=gray(0,0.1),cex=0.5,add=TRUE)
@@ -275,8 +292,8 @@ e<-rasterize(vect(s[,1]),predictors[[1]],field=1,fun="length",background=0)
 #e<-rasterize(s[s$genus%in%c("Carex"),1],predictors[[1]],field=1,fun="count",background=0)
 
 sspecies<-s[,"species"]
-cells<-raster::extract(e,vect(sspecies),cells=TRUE)
-sspecies[,c("cell")]<-cells[,1]
+cells<-terra::extract(e,vect(sspecies),cells=TRUE)
+sspecies[,c("cell")]<-cells[,"cell"]
 sspecies<-sspecies[!duplicated(as.data.table(sspecies[,c("species","cell")])[,geometry:=NULL]),]
 especies<-rasterize(vect(sspecies),predictors[[1]],field=1,fun="length",background=0)
 checkpoint("Rasterize for effort done")
@@ -301,8 +318,8 @@ domain<-st_coordinates(st_sample(st_as_sf(region),5000))
 domain <- inla.nonconvex.hull(domain,convex = -0.015,resolution=75)
 checkpoint("Region and domain done")
 
-pedge<-0.02
-edge<-min(c(diff(bbox(region)[0.2,])*pedge,diff(bbox(region)[2,])*pedge))
+pedge<-0.001
+edge<-min(c(diff(bbox(region)[1,])*pedge,diff(bbox(region)[2,])*pedge))
 edge
 
 checkpoint("Mesh")
@@ -325,7 +342,7 @@ dev.off()
 
 #bpriors<-list(prec=list(default=1/(10)^2,barren=1/(10)^2,harsh=1/(10)^2,latitude=1/(10)^2,latitude2=1/(10)^2,Intercept=1/(100)^2,sbias=1/(100)^2),mean=list(default=0,Intercept=0,barren=0,harsh=0,latitude=0,latitude2=0,sbias=0))
 
-bpriors<-list(prec=list(default=1/(1)^2,Intercept=1/(20)^2,sbias=1/(20)^2,fixed=1/(20)^2),mean=list(default=0,Intercept=0,sbias=0,fixed=0))
+bpriors<-list(prec=list(default=1/(0.2)^2,Intercept=1/(20)^2,sbias=1/(20)^2,fixed=1/(20)^2),mean=list(default=0,Intercept=0,sbias=0,fixed=0))
 
 #dummy<-setValues(predictors[[1:2]],runif(2*ncell(predictors[[1]])))
 #names(dummy)<-c("dummy1","dummy2")
@@ -346,7 +363,13 @@ bpriors<-list(prec=list(default=1/(1)^2,Intercept=1/(20)^2,sbias=1/(20)^2,fixed=
 #vars<-c("builtup","cultivated","forested","prec","tmean","tmean2","herbaceous","shrubs","broadleafs","mixed","conifers","water")
 #vars<-c("tmean","tmean2","broadleafs","broadleafs_tmean","broadleafs_tmean2")
 #vars<-c("tmean","tmean2","broadleafs","mixed","conifers","builtup","herbaceous","cultivated","shrubs","elevation","flooded","harsh")
-vars<-c("tmean","tmean2","broadleafs","builtup","cultivated","cultivated2","herbaceous","mixed","shrubs","truggedness")
+vars<-c("tmean","tmean2","broadleafs","builtup","cultivated","herbaceous","mixed","shrubs","shrubs2","prec","prec2","conifers","harsh","shrubs_tmean","shrubs2_tmean","shrubs_tmean2","shrubs2_tmean2")
+#vars<-"builtup"
+#vars<-c("shrubs","shrubs2")
+#predictors<-c(predictors,shrubs3=predictors[["shrubs"]]^3,shrubs3=predictors[["shrubs"]]^4,shrubs3=predictors[["s5hrubs"]]^5)
+#names(predictors)[(nlyr(predictors)-2):nlyr(predictors)]<-c("shrubs3","shrubs4","shrubs5")
+#vars<-c("shrubs")
+#vars<-c("tmean","broadleafs","builtup","cultivated","herbaceous")
 #vars<-c("cultivated","cultivated2","cultivated3","cultivated4")
 #vars<-c("forested","elevation","latitude","latitude2","elevation_latitude")
 #vars<-c("conifers","elevation")
@@ -378,7 +401,7 @@ f<-formula(paste("y~",paste(vars,collapse="+")))
 
 #species<-c("Bonasa umbellus","Archilochus colubris","Strix varia","Certhia americana","Melospiza lincolnii")
 #species<-names(rev(sort(table(s$species)))[60:69])
-species<-c("Hylocichla mustelina")
+species<-c("Tyrannus tyrannus")
 #species<-unique(s$species)[grep("Setophaga",unique(s$species))][1]
 #species<-c("Acer saccharum","Acer saccharinum","Acer rubrum","Fraxinus nigra","Fraxinus americana","Fraxinus pennsylvanica","Populus balsamifera","Populus deltoides","Populus tremuloides","Populus grandidentata","Pinus banksiana","Pinus strobus","Picea mariana","Abies balsamea","Larix laricina")
 #species<-c("Pinus banksiana","Picea mariana","Abies balsamea","Larix laricina","Tilia americana")
@@ -404,9 +427,25 @@ ninit<-1
 
 loccs<-lapply(species,function(x){
   occ<-s[s$species==x,]  
+  #occ<-occ[st_coordinates(occ)[,1]>-1000,]
+  #samp<-occ[sample(1:nrow(occ),10000,replace=TRUE),]
+  #samp<-st_jitter(samp,fac=0.0000002)
+  #occ<-st_join(samp,na,join=st_intersects)
   occsp<-as(occ,"Spatial")
 })
 names(loccs)<-species
+
+
+#x<-species[1]
+#occ<-s[s$species==x,]
+#samp<-occ[sample(1:nrow(occ),20000,replace=TRUE),]
+#samp<-st_jitter(samp,fac=0.02)
+#samp<-st_join(samp,na,join=st_intersects)
+#plot(mapMean[["mean"]])
+#plot(st_geometry(occ),add=TRUE)
+#plot(st_geometry(samp),add=TRUE)
+
+
 
 predictorswrap<-wrap(predictors)
 ewrap<-wrap(e)
@@ -522,7 +561,8 @@ weight <- ppWeight(sPoly = region, mesh = Mesh)
 f2<-update(f,reformulate(c(".","fixed")))
 #f<-y~tmean+mixed+conifers
 checkpoint("Model")
-mpp <- ppSpace(f, sPoints = occsp,
+mpp <- ppSpace2(formula = f, 
+               sPoints = occsp,
                explanaMesh = explana,
                ppWeight = weight,
                prior.range = c(50,0.1),
@@ -597,21 +637,79 @@ print(j)
 }
 
 
+#weight <- ppWeight(sPoly = region, mesh = Mesh)
+dmesh<-st_as_sf(attributes(weight)$dmesh)
+polys <- st_intersection(st_as_sf(explana$sPoly),st_as_sf(attributes(weight)$dmesh))
+eff1 <- exact_extract(explana$X[["sbias"]], 
+                       polys, 
+                       fun = function(values, coverage){
+                         sum(values * coverage, na.rm = TRUE)
+                       },progress = TRUE)
+#k <- weight > 0
+#weight1<-weight2<-weight
+#weight1[k] <- weight[k] * ((eff1 / weight[k]) / max(eff1 / weight[k]))
+#o1<-st_intersects(polys,s)
+#nbsp<-sapply(o,function(i){
+#  length(unique(s$species[i]))
+#})
+#eff2<-
+#weight2[k] <- weight[k] * ((eff2 / weight[k]) / max(eff2 / weight[k]))
+plot(eff1,eff2)
+k <- weight > 0
+#weight[k] <- weight[k] * ((e/weight[k])/max(e/weight[k]))
+dmesh$e<-numeric(length(weight))
+dmesh$e[k]<-e
+dmesh$weight<-ifelse(weight==0,NA,weight)
+dmesh$counts<-lengths(st_intersects(dmesh,s))
+png(paste0("/data/sdm_rbq/graphics/effort_dmesh.png"),units="in",width=10,height=10,res=500)
+plot(dmesh["weight"],pal=magma,,nbreaks=100,key.pos=1,reset=FALSE,lwd=0.1)
+plot(st_geometry(st_as_sf(explana$sPoly)),border="red",add=TRUE,lwd=0.2)
+dev.off()
+
+o1<-st_intersects(s,dmesh)
+
+
+o2<-st_intersects(dmesh,s)
+nbsp<-sapply(o2,function(i){
+  length(unique(s$species[i]))
+})
+
+
+eff<-lengths(st_intersects(polys,s))
+nbsp<-sapply(st_intersects(polys,s),function(i){
+  length(unique(s$species[i]))
+})
+pres<-as.logical(lengths(st_intersects(polys,occs))>0)
+eff2<-eff*scales::rescale(pres/nbsp,to=c(1,max(nbsp)))
+eff2<-ifelse(is.nan(eff2) | is.infinite(eff2),0,eff2)
+
+polys$eff1<-sqrt(eff1)
+polys$eff2<-sqrt(eff2)
+
+plot(polys,key.pos=4,border=NA)
+
+inla.mesh.dual2<-source("https://raw.githubusercontent.com/ReseauBiodiversiteQuebec/mapSpecies/dev/R/inla.mesh.dual.R")
+system.time(mapSpecies:::inla.mesh.dual(Mesh))
+system.time(inla.mesh.dual2(Mesh))
+
+
+
+
 checkpoint("Mapping predictors")
 
 vs<-unique(gsub("[[:digit:]]","",names(r)))
 vs<-vs[!vs%in%c("fixed","sbias")]
-mf<-n2mfrow(length(vs))
+mf<-n2mfrow(length(names(op)))
 dmesh<-st_as_sf(attributes(weight)$dmesh)
 msmean<-function(values,coverage){
   colSums(values*coverage,na.rm=TRUE)/sum(coverage,na.rm=TRUE)
 }
-x<-t(exact_extract(op[[vs]],dmesh,fun=msmean,progress=TRUE))
-dmesh[,vs]<-round(do.call("cbind",lapply(colnames(x),function(i){backTransform(x[,i],i)})),15)
-#dmesh[,vs]<-x
+x<-t(exact_extract(op[[names(op)]],dmesh,fun=msmean,progress=TRUE,max_cells_in_memory=3e+12))
+#dmesh[,vs]<-round(do.call("cbind",lapply(colnames(x),function(i){backTransform(x[,i],i)})),15)
+dmesh[,names(op)]<-x
 png("/data/sdm_rbq/graphics/predictors_dmesh.png",width=mf[2]*4,height=mf[1]*4,res=500,units="in")
 par(mfrow=mf,bg="black")
-lapply(vs,function(i){
+lapply(names(op),function(i){
   plot(dmesh[i],pal=magma,nbreaks=100,lwd=0.05,border=adjustcolor("white",0.25),mar=c(0,0,0,0),key.pos=NULL,reset=FALSE)
   plot(st_geometry(na),lwd=0.30,border=adjustcolor("white",0.85),mar=c(0,0,0,0),add=TRUE)
   mtext(side=3,line=-6,text=i,adj=0.90,col="white",font=2)
@@ -635,7 +733,7 @@ checkpoint("Marginal effects")
 
 m<-mpp
 class(m)<-"inla"
-nsims<-2000
+nsims<-500
 samples<-inla.posterior.sample(nsims,m)
 
 params<-dimnames(m$model.matrix)[[2]]
@@ -734,6 +832,7 @@ dev.off()
 ##############
 ##############
 
+
 x1<-t(exact_extract(op[[c("cultivated","shrubs")]],dmesh,fun=msmean,progress=TRUE))[,1]
 x2<-t(exact_extract(predictors[[c("cultivated","shrubs")]],dmesh,fun=msmean,progress=TRUE))[,1]
 x2<-backTransform(x2,"cultivated")
@@ -748,6 +847,13 @@ hist(x2,breaks=20,freq=FALSE,main="predictors")
 hist(x3,breaks=20,freq=FALSE,main="r")
 hist(x4,breaks=20,freq=FALSE,main="model.matrix")
 
+
+mm<-as.matrix(mpp$model.matrix)[,-1]
+par(mfrow=n2mfrow(ncol(mm)))
+lapply(vs,function(i){
+  hist(backTransform(mm[,i],i),main=i)
+  #hist(mm[,i],main=i)
+})
 
 checkpoint("Done")
 
@@ -1394,7 +1500,7 @@ corrplot(cor(st_drop_geometry(dmesh[,vs])),method="number",number.cex=0.5)
 #### VIF ######################################################
 
 ### check vif for specific model
-vs<-unique(gsub("[[:digit:]]","",names(r)))
+vs<-unique(gsub("[[:digit:]]","",vars))
 vs<-vs[!vs%in%c("sbias","fixed")]
 dmesh$y<-rnorm(nrow(dmesh))
 mo<-lm(formula(paste("y~",paste(vs,collapse="+"))),data=st_drop_geometry(dmesh))
@@ -1512,3 +1618,122 @@ print("Reaches end of exclusion zone?")
 }
 
 print("End script")
+
+
+#a1<-st_read("/data/predictors_sdm/expert_maps/IUCN/REPTILES.shp")
+#a2<-st_read("/data/predictors_sdm/expert_maps/IUCN/AMPHIBIANS.shp")
+#a<-rbind(a1,a2)
+#a$species<-a$binomial
+#em<-st_transform(a,st_crs(s))
+
+# https://www.usgs.gov/programs/gap-analysis-project/science/species-data-download
+
+splist<-d$species
+#splist<-splist[splist%in%em$species]
+sp<-sample(names(rev(sort(table(splist))))[1:length(unique(splist))],1)
+#sp<-"Lithobates palustris"
+x<-s[s$species==sp,]
+plot(st_geometry(x),pch=16,col=adjustcolor("darkgreen",0.2))
+plot(st_geometry(na),add=TRUE,border=gray(0,0.15))
+
+n<-1:nrow(x)
+n<-n[unique(round(seq(min(n),max(n),length.out=100),0))]
+l<-lapply(n,function(i){
+  print(i)
+  xx<-x[sample(1:nrow(x),i,replace=FALSE),]
+  st_union(xx)
+})
+
+#obs<-rev(sort(table(x$recordedBy)))[1:10]
+
+m<-do.call("c",l)
+m<-st_convex_hull(m)
+par(mfrow=c(2,2),mar=c(2,2,0,0))
+plot(st_buffer(st_geometry(x),dist=250),border="white")
+w<-which(em$species==sp)
+if(any(w)){
+  plot(st_geometry(em[w,]),add=TRUE,col=gray(0,0.15),border=NA)
+}
+plot(st_geometry(x),pch=16,col=adjustcolor("darkgreen",0.2),add=TRUE)
+plot(st_geometry(na),border=gray(0,0.15),add=TRUE)
+plot(m,border=gray(0,0.05),add=TRUE)
+mtext(side=3,line=-1.5,adj=0.0,text=sp,font=2,xpd=TRUE)
+
+a <- as.numeric(max(st_area(m)))
+b <- 0.01
+model <- nls(Y ~ ((a/b)*X)/(1+(X/b)),
+ data = data.frame(Y=as.numeric(st_area(m)),X=n-1),
+ start = list(a = a, b = b))
+ plot(n,st_area(m),ylim=range(c(0,coef(model)["a"],st_area(m)))*1.05)
+lines(0:max(n),predict(model,data.frame(X=0:max(n))),col="red",lwd=2)
+abline(h=coef(model)["a"],lty=3,col="red")
+mtext(side=1,adj=0.9,text=round(a/coef(model)["a"],2),font=2,col="red",line=-3,cex=2)
+
+hist(st_area(m),breaks=50)
+
+
+rangeHull<-function(x,species="species",breaks=50,plot=TRUE){
+  n<-1:nrow(x)
+  n<-n[unique(round(seq(min(n),max(n),length.out=breaks),0))]
+  l<-lapply(n,function(i){
+    print(i)
+    xx<-x[sample(1:nrow(x),i,replace=FALSE),]
+    st_union(xx)
+  })
+
+#obs<-rev(sort(table(x$recordedBy)))[1:10]
+
+  m<-do.call("c",l)
+  m<-st_convex_hull(m)
+  
+  par(mfrow=c(2,2),mar=c(2,2,0,0))
+  plot(st_buffer(st_geometry(x),dist=250),border="white")
+  w<-which(em$species==i)
+  if(any(w)){
+    plot(st_geometry(em[w,]),add=TRUE,col=gray(0,0.15),border=NA)
+  }
+  plot(st_geometry(x),pch=16,col=adjustcolor("darkgreen",0.2),add=TRUE)
+  plot(st_geometry(na),border=gray(0,0.15),add=TRUE)
+  plot(m,border=gray(0,0.05),add=TRUE)
+  mtext(side=3,line=-1.5,adj=0.0,text=sp,font=2,xpd=TRUE)
+
+  a <- as.numeric(max(st_area(m)))
+  b <- 0.01
+  model<-tryCatch(nls(Y ~ ((a/b)*X)/(1+(X/b)),
+    data = data.frame(Y=as.numeric(st_area(m)),X=n-1),
+    start = list(a = a, b = b)),error=function(j){TRUE})
+  if(!isTRUE(model)){  
+    plot(n,st_area(m),ylim=range(c(0,coef(model)["a"],st_area(m)))*1.05)
+    lines(0:max(n),predict(model,data.frame(X=0:max(n))),col="red",lwd=2)
+    abline(h=coef(model)["a"],lty=3,col="red")
+    mtext(side=1,adj=0.9,text=round(a/coef(model)["a"],2),font=2,col="red",line=-3,cex=2)
+    hist(st_area(m),breaks=50)
+    list(hull=m,nobs=nrow(x),a=coef(model)["a"],reach=a/coef(model)["a"])
+  }else{
+    list(hull=m,nobs=nrow(x),a=NA,reach=NA)
+  }
+}
+
+rangeHull(occs,breaks=50)
+
+
+tab<-table(d$species)
+tab<-tab[tab>50]
+sp<-sample(names(tab),100)
+r<-sapply(sp,function(i){
+  print(i)
+  #splist<-splist[splist%in%em$species]
+  #sp<-sample(names(rev(sort(table(splist))))[1:length(unique(splist))],1)
+#sp<-"Lithobates palustris"
+  x<-s[s$species==i,]
+  r<-rangeHull(x,breaks=20)
+  r$reach
+})
+  
+prop<-length(which(r>=0.95))/length(r) 
+prop*length(tab)
+prop*length(tab)/length(unique(d$species))
+
+
+
+1+1
