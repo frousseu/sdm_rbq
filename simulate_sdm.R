@@ -6,6 +6,7 @@ library(fields)
 library(terra)
 library(scales)
 library(raster)
+library(terra)
 library(RandomFields)
 
 grDevices:::windows.options(record=TRUE)
@@ -200,12 +201,12 @@ for(k in seq_along(params[[1]])){
   
   Mesh<-inla.mesh.2d(loc.domain = as(extent(region),"SpatialPoints"),max.edge = c(edge,edge*1.5),min.angle = 21,cutoff = edge/2,offset = c(edge,edge*2),crs = crs(region))
   #explana<-explanaMesh(sPoly=region,mesh=Mesh,X=r)
-  explana<-explanaMesh(sPoly=region,meshSpace=Mesh,meshTime=NULL,X=r)
-  weight<-ppWeight(sPoly=region, mesh=Mesh)
+  explana<-explanaMesh(sPoly=st_as_sf(region),meshSpace=Mesh,meshTime=NULL,X=rast(r))
+  weight<-ppWeight(sPoly=st_as_sf(region), mesh=Mesh)
   
   
   bpriors<-list(prec=list(default=1/(10)^2,Intercept=1/(100)^2,effort=1/(10)^2,logeffort=1/(0.00000001)^2),mean=list(default=0,Intercept=0,effort=0,logeffort=1))
-  m<-ppSpace(y ~ xx+yy, sPoints = occ_thinsp,
+  m<-ppSpace(y ~ xx+yy, sPoints = occ_thin,
              explanaMesh = explana,
              ppWeight = weight,
              prior.range = c(50,0.01),
