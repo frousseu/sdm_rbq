@@ -141,7 +141,7 @@ coast<-st_as_sfc(st_bbox(r))
 coast<-st_difference(coast,st_union(na))
 dis<-st_distance(coast,st_centroid(dmesh))
 distance<-as.numeric(dis[1,])
-logdistance<-log(dmesh$distance+1,base=10)
+logdistance<-log(distance+1,base=10)
 
 distance<-(distance-mean(distance))/sd(distance)
 adds<-matrix(mean(distance),ncol=1)
@@ -382,9 +382,11 @@ x$species
 }
 
 
-
-
-
+### Create result file
+#df<-data.frame(matrix(ncol = 6, nrow = 0))
+#colnames(df)<-c("species","date","n","reach","predictors","correlation","I")
+#write.csv(df,file="/data/sdm_rbq/graphics/mapSpeciesres.csv",row.names=FALSE,append=FALSE)
+#df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
 
 
 #############################################################

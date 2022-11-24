@@ -159,7 +159,7 @@ for(k in seq_along(params[[1]])){
   mtext(side=3,line=0,outer=FALSE,cex=0.6,text="Realized effort")
   #par(mfrow=c(1,1))
   eff<-stack(eff,setValues(eff,1:ncell(eff)))
-  le<-values(log(eff[[1]]))
+  le<-raster::values(log(eff[[1]]))
   le<-ifelse(is.infinite(le),0,le)           
   r<-stack(r,eff[[1]],setValues(eff[[1]],le))
   names(r)<-c("xx","yy","effort","logeffort")
@@ -195,7 +195,7 @@ for(k in seq_along(params[[1]])){
   region<-as(extent(win),"SpatialPolygons")
   proj4string(region)<-prj
   
-  pedge<-0.04
+  pedge<-0.01
   edge<-min(c(diff(bbox(region)[1,])*pedge,diff(bbox(region)[2,])*pedge))
   
   

@@ -3,12 +3,14 @@ library(mapSpecies)
 
 ### This where the list of species to submit is chosen along with data inputs to the model
 ### 
-species<-c("Vireo vicinior")
+species<-c("Artemisiospiza belli","Charadrius nivosus","Lagopus lagopus","Lanius borealis","Stercorarius parasiticus","Thalasseus sandvicensis","Tyrannus melancholicus")
 tab<-table(d$species)
 tab<-names(tab)[tab>30]
 tab<-tab[d$ebird[match(tab,d$ebird)]%in%ed$scientific_name]
 set.seed(sample(1:10000,1))
-species<-sample(tab,6)
+df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
+tab<-tab[!tab%in%df$species]
+#species<-sample(tab,9)
 (lspecies<-species)
 d[species%in%lspecies,][,.(n=.N),by=.(species)]
 

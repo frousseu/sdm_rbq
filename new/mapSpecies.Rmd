@@ -1,0 +1,76 @@
+---
+title: "mapSpecies"
+output: 
+  html_document:
+    pandoc_args: "--self-contained"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+---
+
+
+```{css, echo=FALSE}
+.link {
+  font-size: 30px;
+}
+```
+
+
+```{r setup, include=FALSE, echo=FALSE}
+library(magick)
+library(tesseract)
+library(ebirdst)
+knitr::opts_chunk$set(echo = FALSE)
+eng <- tesseract("eng")
+data(ebirdst_runs)
+ebird<-ebirdst_runs
+```
+
+
+
+
+```{r, fig.height=8, fig.width=10, out.heigth="100%", out.width="100%", echo=FALSE}
+x<-list.files("C:/Users/God/Downloads/sdms",full=TRUE,pattern="birds_")
+x<-x[substr(file.info(x)$mtime,1,10)>="2022-10-16"]#[1:5]
+
+invisible(l<-lapply(seq_along(x),function(i){
+  im<-image_read(x[i])
+  image_write(image_scale(im,"800"),gsub("birds_","birds2_",x[i]))
+  sp<-basename(x[i]) |> gsub("birds_|.png","",x=_) |> gsub("_"," ",x=_)
+  m<-match(sp,ebird$scientific_name)
+  species_code<-ebird$species_code[m]
+  common_name<-ebird$common_name[m]
+  url<-paste0("https://science.ebird.org/en/status-and-trends/species/",species_code,"/abundance-map?season=breeding&static=true")
+  im2<-image_crop(im,geometry="1700x200",gravity="northwest") 
+  lab<-tesseract::ocr(im2,engine = eng)
+  if(!any(grep(sp,lab)) | any(grep("NA",lab))){
+    #print(paste(sp,"not found or NA"))
+  }else{
+    #print(i)
+    #reach<-sapply(strsplit(lab,"reach"),"[",1)
+    reach<-as.numeric(unlist(regmatches(lab,gregexpr("[[:digit:]]+\\.*[[:digit:]]*",lab))))
+    #reach<-reach[3:4]
+    if(reach[3]>=100 & reach[4]>=0.85){
+      list(url=url,sp=sp,name=common_name,n=reach[3],reach=reach[4])
+    }else{
+      NULL
+    }
+  }
+}))
+
+```
+
+
+```{r, fig.height=6, fig.width=8, out.heigth="100%", out.width="100%", echo=FALSE, results="asis"}
+for(i in seq_along(l)){
+  if(!is.null(l[[i]])){
+    cat(paste(rep("<br>",7),collapse=""),"\n")
+    cat(paste0("<a href=",l[[i]]$url," target=\"_blank\" class=\"link\">eBird map for ",l[[i]]$name," (",l[[i]]$sp,")","</a>"),"\n")
+    cat(paste("![](",gsub("birds_","birds2_",x[i]),"){width=70%}"),"\n")
+  }
+}
+
+```
+
+
+<!-- browseURL("C:/Users/God/Downloads/sdms/mapSpecies.html") -->
+
+

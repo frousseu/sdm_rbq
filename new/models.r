@@ -147,8 +147,10 @@ if(TRUE){
   x<-unlist(lapply(grep("2|tmean",vars_pool,value=TRUE,invert=TRUE),function(k){
     x<-backTransform(dmeshPred[,k],k)
     h<-hist(x[dmesh$spobs>0],breaks=seq(min(x),max(x),length.out=100),  plot=FALSE)
-    h$density
-    if(sum(h$density[8:length(h$density)])==0){
+    #h$density
+    w<-max(which(h$density>0))
+    #if(sum(h$density[11:length(h$density)])==0){
+    if(h$mids[w]<=0.15){ # removes vars with coverage below 0.15
       k
     }else{
       NULL
@@ -359,6 +361,8 @@ colo<-list(
 
 colmean<-c("snow2",unname(palette.colors()[7]),"darkred","darkred","grey10")
 
+colmean<-c("#EEEFF0","#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00","darkorange") #https://observablehq.com/@d3/radial-stacked-bar-chart
+
 checkpoint("Chull reach asymptote?")
 
 rh<-rangeHull(sPoints,species=sp,breaks=200)$reach
@@ -403,9 +407,28 @@ dev.off()
  
 print(j) 
 
-list(mpp=mpp,spobs=spobs,dmesh=dmesh)
+list(species=sp,mpp=mpp,spobs=spobs,dmesh=dmesh,n=nrow(spobs),reach=round(rh,5),date=substr(Sys.time(),1,10),predictors=paste(vars,collapse="+"))
+
 }, future.packages = "data.table")
 plan(sequential)
+
+
+# write some info
+df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
+add<-do.call("rbind",lapply(ml,function(i){
+  data.frame(
+    species=i$species,
+    date=i$date,
+    n=i$n,
+    reach=i$reach,
+    predictors=i$predictors,
+    correlation=NA,
+    I=NA
+  )
+}))
+df<-rbind(df,add)
+df<-df[rev(order(df$date)),][!duplicated(df$species),]
+write.csv(df,file="/data/sdm_rbq/graphics/mapSpeciesres.csv",row.names=FALSE,append=FALSE)
 
 
 species

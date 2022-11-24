@@ -1,0 +1,41 @@
+---
+title: "Comparison mapSpecies/eBird"
+output: 
+  html_document:
+    pandoc_args: "--self-contained"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+---
+
+
+```{css, echo=FALSE}
+.link {
+  font-size: 30px;
+}
+```
+
+
+```{r setup, include=FALSE, echo=FALSE}
+library(magick)
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+```{r,echo=FALSE}
+l<-list.files("C:/Users/God/Downloads/sdms",full=TRUE,pattern="_comparison.png")
+```
+
+```{r,echo=FALSE,results="asis"}
+  cat(paste(rep("<br>",2),collapse=""),"\n")
+```
+
+```{r,echo=FALSE, results="asis"}
+for(i in seq_along(l)){
+  #cat(paste(rep("<br>",7),collapse=""),"\n")
+  cat(paste("![](",l[i],"){width=70%}"),"\n")
+}
+```
+
+
+<!-- browseURL("C:/Users/God/Downloads/sdms/comparison.html") -->
+
+
