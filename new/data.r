@@ -8,6 +8,10 @@ library(terra)
 library(sf)
 library(jsonlite)
 library(ebirdst)
+library(tidyr)
+library(berryFunctions)
+library(FRutils)
+library(rmapshaper)
 #library(rnaturalearth)
 
 #########################################################################
@@ -21,32 +25,37 @@ nalakes<-st_transform(nalakes,st_crs(na))
 areas<-as.numeric(st_area(nalakes))
 ke<-paste(c("Manicouagan","-Jean"),collapse="|")
 nalakes<-nalakes[unique(c(rev(order(areas))[1:50],grep(ke,nalakes$name_fr))),]
-plot(st_geometry(na),col="grey90",border="white")
-plot(st_geometry(nalakes),col="lightblue",border=NA,add=TRUE)
+coast<-st_union(na)
+na2<-ms_simplify(na,0.05)
+nalakes2<-ms_simplify(nalakes,0.05)
+coast2<-ms_simplify(coast,0.05)
+#plot(st_geometry(na),col="grey90",border="white")
+#plot(st_geometry(nalakes),col="lightblue",border=NA,add=TRUE)
 
 
 ### load predictors
-checkpoint("Predictor transformations")
+#checkpoint("Predictor transformations")
 op<-rast("/data/predictors_sdm/predictors.tif")
 
 ### Data transformations
 # predictors<-scale(predictors)
 # the following is the equivalent (see terra help)
-means <- global(op, "mean", na.rm=TRUE)
-pre <- op - means[,1]
-sds <- global(pre, "rms", na.rm=TRUE)
+#means <- global(op, "mean", na.rm=TRUE)
+#pre <- op - means[,1]
+#sds <- global(pre, "rms", na.rm=TRUE)
 #predictors <- pre / sds[,1]
 # function to backtransform to orginal scale
-backTransform<-function(x,var){
-  m<-match(var,row.names(means))
-  me<-means[m,"mean"]
-  sd<-sds[m,"rms"]
-  (x*sd)+me
-}
+#backTransform<-function(x,var){
+#  m<-match(var,row.names(means))
+#  me<-means[m,"mean"]
+#  sd<-sds[m,"rms"]
+#  (x*sd)+me
+#}
 
-predictors<-rast("/data/predictors_sdm/predictors_transformed.tif")
+predictors<-rast("/data/predictors_sdm/predictors.tif")
+#predictors<-rast("/data/predictors_sdm/predictors_transformed.tif")
 #predictors<-aggregate(predictors,2)
-checkpoint("Predictor transformations done")
+#checkpoint("Predictor transformations done")
 
 #######################################
 ### eBird info
@@ -202,7 +211,8 @@ d[,c("x","y"):=asplit(st_coordinates(s),2)]
 checkpoint("Make filter grid")
 g<-rast(extent=ext(na)+5,resolution=5)
 g<-setValues(g,1:ncell(g))
-d$cell<-extract(g,vect(s))[,2]
+ex<-terra::extract(g,vect(s))
+d$cell<-ex[,2]
 d<-d[!is.na(cell),]
 #d[,cell:=s$cell]
 # slower older version

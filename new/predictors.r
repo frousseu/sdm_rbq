@@ -1,4 +1,9 @@
 
+
+# wget ftp://geo10.elie.ucl.ac.be/CCI/LandCover/ESACCI-LC-L4-LCCS-Map-300m-P1Y-2015-v2.0.7.zip -outfile "C:/Users/God/Downloads/ESACCI-LC-L4-LCCS-Map-300m-P1Y-2015-v2.0.7.zip"
+
+
+
 ### This file gathers predictors and other necessities such as shapefile for region delineation
 
 ### The output of thiis file is 
@@ -84,7 +89,9 @@ for(i in k){
 
 
 ###################################################
-### Earth Env data
+### Earth Env data ################################
+###################################################
+
 # https://data.earthenv.org/consensus_landcover/without_DISCover/Consensus_reduced_class_11.tif
 
 path<-"C:/Users/rouf1703/Documents/UdeS/Programmation/mapSpecies/earthenv/landcover"
@@ -153,7 +160,9 @@ names(lat)<-c("longitude","latitude")
 
 
 ###################################################
-### Ecoregions
+### Ecoregions ####################################
+###################################################
+
 # https://www.epa.gov/eco-research/ecoregions-north-america
 #predictors<-rast("/data/predictors_sdm/predictors.tif")
 ecoregions<-st_read("/data/predictors_sdm/ecoregions/NA_CEC_Eco_Level3.shp")
@@ -175,7 +184,6 @@ res<-res[sapply(res,function(i){max(values(i))})>0]
 eco<-rast(res)
 names(eco)<-paste0("eco",gsub(" |-|,|/","",names(res)))
 
-
 #r<-predictors[["mixed"]]
 #plot(r)
 #plot(st_geometry(ecoregions),add=TRUE)
@@ -187,15 +195,116 @@ names(eco)<-paste0("eco",gsub(" |-|,|/","",names(res)))
 #plot(ecoregions["ecoreg"],reset=FALSE)
 #text(st_coordinates(st_centroid(ecoregions)),#label=ecoregions$ecoreg,cex=0.75)
 
+predictors<-c(wc,ee,lat,eco)
+rm(wc,ee,lat,eco)
+gc();gc()
+
+
+#############################################
+### ESA landcover ###########################
+#############################################
+
+predictors<-rast("/data/predictors_sdm/predictors.tif")
+
+terraOptions(verbose=TRUE)
+
+#ex<-st_bbox(st_buffer(st_union(dmesh),100))
+#ex<-as.numeric(ex[1:4]);dput(ex)
+#ex<-c(-3684.24737352875, -2945.59597777864, 3545.19489942029, 4138.16353809898
+)
+#ex<-st_as_sfc(st_bbox(st_sf(a=1:2,geom=st_sfc(st_point(ex[1:2]),st_point(ex[3:4])),crs=st_crs(predictors))))
+
+
+
+# http://maps.elie.ucl.ac.be/CCI/viewer/download/CCI-LC_Maps_Legend.pdf
+esa_classes<-list(
+  deciduous_esa=c(60,61,62),
+  mixed_esa=90,
+  conifers_esa=c(70,71,72,80,81,82),
+  shrubs_esa=c(120,121,122),
+  crop_esa=c(10,11,12,20,30,40),
+  grass_esa=130,
+  builtup_esa=190,
+  water_esa=210,
+  sparse_esa=150:153,
+  harsh_esa=c(140,200,201,202,220),
+  wettree_esa=c(160,170),
+  wetherbaceous_esa=180,
+  mosaic_esa=c(100,110)
+)
+
+esa<-rast("/data/predictors_sdm/esa/C3S-LC-L4-LCCS-Map-300m-P1Y-2020-v2.1.1.nc")
+
+#me<-st_transform(st_geometry(na[na$NAME_1%in%"Québec",]),crs=st_crs(esa))
+#me<-st_transform(st_as_sfc(st_bbox(ext(-77,-70,45,48),crs=4326)),crs=st_crs(esa))
+#me<-st_transform(st_geometry(na),crs=st_crs(esa))
+#me<-st_transform(st_geometry(dmesh),crs=st_crs(esa))
+#ex<-st_transform(st_geometry(ex),crs=st_crs(esa))
+ex<-st_transform(st_as_sfc(st_bbox(ext(-175,-45,17,88),crs=4326)),crs=st_crs(esa))
+e <- ext(st_bbox(ex)[c(1,3,2,4)])
+esa <- crop(esa, e)
+esalcc<-esa[[1]]
+
+for(i in seq_along(esa_classes)){
+  print(i)
+  esalcc<-subst(esalcc,esa_classes[[i]],i)
+}
+
+
+esa<-lapply(seq_along(esa_classes),function(i){
+  print(i)
+  lc<-segregate(esalcc,classes=i)
+  project(lc,predictors[[1]])
+})
+esa<-rast(esa)
+names(esa)<-names(esa_classes)
+
+predictors<-c(predictors,esa)
+
+
+#plot(lc,mar=c(0,0,0,0))
+#plot(st_transform(st_geometry(na),crs=st_crs(lc)),border="black",lwd=0.5,add=TRUE)
+
+#dme<-st_transform(st_geometry(dmesh),crs=st_crs(lc))
+#plan(multicore,workers=4)
+#cores<-nbrOfWorkers() # get nbr of workers from the chosen plan
+#chunks <- split(1:length(dme), rep(1:cores, each=ceiling(length(dme)/cores))[1:length(dme)])
+#options(future.globals.maxSize = 1000 * 1024 ^ 2)
+#res<-future_lapply(chunks,function(chunksi){
+#exact_extract(lc,dme[chunksi],fun="mean",progress=TRUE)
+#res<-t(res)
+#})
+#plan(sequential)
+#dmesh$test<-ifelse(is.nan(unlist(res)),NA,unlist(res))
+
+#options(vsc.dev.args = list(width = 800, height = 400))
+#png("/data/sdm_rbq/graphics/esa.png",width=10,height=8,res=400,units="in")
+#par(mar=c(0,0,0,0),bg="white")
+#plot(dmesh["test"],border=NA,nbreaks=200,pal=viridis::magma,reset=FALSE)
+#plot(st_geometry(na),border="white",lwd=0.5,key.pos=4,add=TRUE)
+#dev.off()
+
+
+
+
+
 
 #############################################
 ### Stack all
-predictors<-c(wc,ee,lat,eco)
-png("/data/sdm_rbq/graphics/predictors.png",width=20,height=15,res=500,units="in")
-plot(predictors,maxnl=100)
-dev.off()
+#predictors<-c(wc,ee,lat,eco)
+#png("/data/sdm_rbq/graphics/predictors.png",width=20,height=15,res=500,units="in")
+#plot(predictors,maxnl=100)
+#dev.off()
 
-writeRaster(predictors,"/data/predictors_sdm/predictors.tif",overwrite=TRUE)
+#writeRaster(predictors,"/data/predictors_sdm/predictors.tif",overwrite=TRUE)
+
+writeRaster(esa,"/data/predictors_sdm/predictors.tif", gdal="APPEND_SUBDATASET=YES")
+
+
+
+
+
+
 
 ############################################
 ### Transform predictors ###################
@@ -277,6 +386,5 @@ predictors<-c(predictors,polys)
 predictors<-c(predictors,ecos)
 
 writeRaster(predictors,"/data/predictors_sdm/predictors_transformed.tif",overwrite=TRUE)
-
 
 

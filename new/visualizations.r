@@ -2,16 +2,27 @@
 library(tidyr)
 library(foreach)
 library(doParallel)
+library(FRutils)
+library(berryFunctions)
+library(magick)
+library(jsonlite)
+library(exiftoolr)
+library(colorspace)
 
 
 options(vsc.dev.args = list(width = 1200, height = 800))
+#options(vsc.dev.args = list(width = 1200, height = 1200))
 
 #############################################################
 ### Plot effects ############################################
 
-#plot(exp(log(sdm[["mean"]])-sdm[["spacemean"]]))
- plot(exp(sdm$linkmean-sdm$spacemean))
+#ci<-c(sdm$"0.025quant",sdm$mean,sdm$"0.975quant")
+#plot(ci,range=range(values(ci),na.rm=TRUE),col=colo.scale(1:200,colmean))
 
+#plot(exp(log(sdm[["mean"]])-sdm[["spacemean"]]))
+plot(exp(sdm$linkmean-sdm$spacemean))#,col=colmean)
+plot(st_geometry(na),border="white",add=TRUE)
+plot(st_geometry(nalakes),col="white",border=NA,add=TRUE)
 #listo<-lapply(ls(), function(x) object.size(get(x)))
 #o<-rev(order(unlist(listo)))
 #setNames(sapply(listo,format,units="auto")[o],ls()[o])
@@ -67,10 +78,10 @@ names(marginals)<-names(nd)
 
 
 preds<-cbind(do.call("rbind",marginals),do.call("rbind",nd))
-ma<-match(names(preds),row.names(means))
+ma<-match(names(preds),names(means))
 ma<-ma[!is.na(ma)]
-preds[row.names(means)[ma]]<-lapply(row.names(means)[ma],function(i){
-  backTransform(preds[[i]],i)
+preds[names(means)[ma]]<-lapply(names(means)[ma],function(i){
+  backScale(preds[[i]],i)
 })
 
 
@@ -87,15 +98,15 @@ preds<-lapply(preds,function(i){
 png(file.path(getwd(),"graphics","marginal_effects.png"),width=10,height=8,units="in",res=300)
 par(mfrow=n2mfrow(length(preds),asp=2),mar=c(3,2,1,1),oma=c(1,1,1,1))
 lapply(names(preds),function(i){
-  xvar<-strsplit(i,"_")[[1]][1]
-  xvar2<-strsplit(i,"_")[[1]][2]
+  xvar<-strsplit(i,"\\.")[[1]][1]
+  xvar2<-strsplit(i,"\\.")[[1]][2]
   xlim<-range(preds[[i]][[1]][,xvar])
   ywide<-unlist(preds)
   ylim<-range(as.numeric(ywide[grep("\\.mean",names(ywide))]))
   #ylim<-range(unlist(do.call("rbind",preds[[i]])[,c("low","mean","high"),drop=FALSE]))
   plot(0.1,0.1,xlab="",ylab="",xlim=xlim,ylim=ylim,type="n",mgp=c(2,0.5,0),tcl=-0.1,log="")
   ### density of values where species is observed
-  vals<-backTransform(dmeshPred[,i],i)
+  vals<-backScale(dmeshPred[,i],i)
   h<-hist(vals[dmesh$spobs>0],breaks=seq(min(vals),max(vals),length.out=40),plot=FALSE)
   h$density<-(h$density/max(h$density))
   h$density<-h$density/(max(h$density)/ylim[2])
@@ -112,7 +123,7 @@ lapply(names(preds),function(i){
   })
   if(length(preds[[i]])>1){
     temp<-do.call("rbind",preds[[i]])
-    var2<-strsplit(temp$vars[1],"_")[[1]][2]
+    var2<-strsplit(temp$vars[1],"\\.")[[1]][2]
     legend("top",title=var2,legend=round(as.numeric(unique(temp[,var2])),2),lwd=1,col=seq_along(preds[[i]]),bty="n",cex=1.25)
   }
 
@@ -141,10 +152,18 @@ library(car)
 vs<-unique(gsub("[[:digit:]]","",vars_pool))
 vs<-vs[!vs%in%c("sbias","fixed")]
 #vs<-c(vs,"water")
+#vs<-vs[!vs%in%c("water_esa")]
 dat<-as.data.frame(dmeshPred)
 dat$y<-rnorm(nrow(dat))
 mo<-lm(formula(paste("y~",paste(vs,collapse="+"))),data=dat)
 vif(mo)
+
+varset<-grep("_esa",vs,value=TRUE)
+hist(rowSums(do.call("cbind",lapply(varset,function(i){
+  backScale(dmeshPred[,i],i)
+}))))
+rowSums(lapply(dmeshPred[,grep("_esa",colnames(dmeshPred))])
+
 
 
 
@@ -235,7 +254,8 @@ lsdms<-list.files("/data/sdm_rbq/rasters",pattern="_birds.tif",full=TRUE)
 lsdms<-lsdms[rev(order(file.info(lsdms)$mtime))]
 
 df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
-sp<-gsub(" ","_",df$species[which(df$reach>=0.00)])
+#sp<-gsub(" ","_",df$species[which(df$reach>=0.00)])
+sp<-gsub(" ","_",unique(df$species))
 lsdms<-lsdms[gsub("_birds.tif","",basename(lsdms))%in%sp]
 
 lsdms<-lsdms[1:min(length(lsdms),5000)]
@@ -289,31 +309,26 @@ no<-unlist(no)
 ### adds latest correlation to df of results
 res<-data.frame(
   species=gsub("_"," ",names(sdms)),
-  correlation=cors,
+  pearson=cors,
   I=no
 )
 df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
 m<-match(df$species,res$species)
-df$correlation<-ifelse(!is.na(m),res$correlation[m],df$correlation)
+df$pearson<-ifelse(!is.na(m),res$pearson[m],df$pearson)
 df$I<-ifelse(!is.na(m),res$I[m],df$I)
 write.csv(df,file="/data/sdm_rbq/graphics/mapSpeciesres.csv",row.names=FALSE,append=FALSE)
 
 ### plot it
-png("/data/sdm_rbq/graphics/overlap.png",width=12,height=10,units="in",res=400)
-ag<-df$I
-ag<-ag[which(df$reach>=0.85)]
-brks<-seq(0.0,1,by=0.1)
-h<-hist(ag,xlim=c(0,1),breaks=brks,border="white",col=adjustcolor("seagreen",0.5),main="",xaxt="n",yaxt="n",xlab="",ylab="")
-axis(1,at=brks,mgp=c(2,1.25,0),pos=c(0,0),col="grey50",col.axis="black",col.ticks="grey50",lwd=5,cex.axis=1.5,font.axis=2)
-axis(2,at=pretty(h$counts),mgp=c(2,1,0),pos=c(-0.0,0),col="grey50",col.axis="black",col.ticks="grey50",lwd=5,cex.axis=1.5,font.axis=2,las=2)
-lines(c(rep(mean(ag,na.rm=TRUE),2)),c(0,par("usr")[4]),lwd=8,col="black")
-mtext(side=1,line=2,text="Overlap",font=2,cex=3)
-mtext(side=2,line=0.5,text="Number of species",font=2,cex=3)
-dev.off()
+overlapHist(x="I",th=0.85,n=50)
+#o<-overlapHist(sp="Columbia livia")
+#plot(image_read(o$path),"#FFFFFF00")
 
-names(sdms)[cors>-0.9 & cors<0.1]
-i<-which(names(sdms)=="Anthus_rubescens")
-
+cl<-makeCluster(20)
+registerDoParallel(cl)
+foreach(i=df$species,.packages=c("sf")) %dopar% {
+  overlapHist(sp=i)
+}
+stopCluster(cl)
 
 ### 
 #sp<-"Pipilo_erythrophthalmus"
@@ -1223,9 +1238,82 @@ test <- interp(x=Mesh$loc[,1],y=Mesh$loc[,2],z=mpp$summary.fitted.values[k,"mean
 
 #####################################################
 #####################################################
+### Species pics ####################################
+#####################################################
+#####################################################
+
+path<-"/data/sdm_rbq/pics"
+
+df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
+#sps<-c("Buteo jamaicensis","Buteo lagopus","Buteo platypterus")
+sps<-sort(df$species)#[1:18]
+sps<-sps[165:length(sps)]
+i<-c("Acanthis hornemanni")
+sps<-i#c("Columba livia")
+
+lapply(sps,function(i){
+  print(i)
+  links<-getCC0links(i,license=c("cc0"))
+  #Sys.sleep(0.05)
+  if(identical(NA,links)){
+    url<-"https://inaturalist-open-data.s3.amazonaws.com/photos/246765575/large.jpg"
+    url<-""
+    link<-"https://www.inaturalist.org/observations/143844420"
+    link<-""
+    author<-""
+    license<-""
+
+  }else{
+    url<-links$url[1]
+    link<-paste0("https://www.inaturalist.org/observations/",links$id[1])
+    if(links$license_code[1]=="cc0"){
+      if(links$name[1]%in%c("",NA)){
+        author<-links$login[1]
+      }else{
+        author<-links$name[1]
+      }
+      license<-paste0("(c) ",author,", ",links$attribution[1]," (CC0)")
+    }else{
+      license<-links$attribution[1]
+    } 
+    
+  }
+  roundIm(url=url,file=gsub(" ","_",i),path=path,link=link,license=license,open=FALSE)
+  print(i)
+})
+
+#exif_read(path = "/data/sdm_rbq/pics/Acanthis_hornemanni_pic.png", #tags = "*Copyright*")$Copyright
+
+
+
+#####################################################
+#####################################################
+### Stabilization graphs ############################
+#####################################################
+#####################################################
+
+lf<-list.files("/data/sdm_rbq/stab/")
+lf<-sapply(strsplit(lf,"_"),function(i){paste(i[1:2],collapse=" ")})
+df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
+#df<-df[df$n>=5,]
+#sp<-sort(df$species[!df$species%in%lf])
+sp<-df$species
+#i<-"Buteo jamaicensis"
+
+lapply(sp,function(i){
+  print(i)
+  sPoints<-getobs(i)
+  rh<-rangeHull(sPoints,species=i,breaks=200)
+  stabHull(i,rh=rh)
+})
+
+#####################################################
+#####################################################
 ### Species maps ####################################
 #####################################################
 #####################################################
+
+#https://stackoverflow.com/questions/64597525/r-magick-square-crop-and-circular-mask
 
 library(magick)
 library(berryFunctions)
@@ -1245,34 +1333,38 @@ pics<-list(
   Setophaga_ruticilla="https://inaturalist-open-data.s3.amazonaws.com/photos/31539046/large.jpg",
   Setophaga_americana="https://inaturalist-open-data.s3.amazonaws.com/photos/135474901/large.jpg",
   Setophaga_citrina="https://inaturalist-open-data.s3.amazonaws.com/photos/19448070/large.jpg",
-  Setophaga_virens="https://inaturalist-open-data.s3.amazonaws.com/photos/199207488/large.jpeg"
+  Setophaga_virens="https://inaturalist-open-data.s3.amazonaws.com/photos/199207488/large.jpeg",
+  Columba_livia="https://inaturalist-open-data.s3.amazonaws.com/photos/238331030/large.jpg",
+  Buteogallus_anthracinus="https://inaturalist-open-data.s3.amazonaws.com/photos/171498636/large.jpeg",
+  Empidonax_hammondii="https://inaturalist-open-data.s3.amazonaws.com/photos/225084266/large.jpeg"
+
 )
 
-path<-"C:/Users/God/Downloads"
+path<-"/data/sdm_rbq/pics"
 colmean<-c("#DDDEE0","#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00","darkorange")
 colmean<-c("#CCCCCC","#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00","darkorange")
 
-ed<-as.data.table(ebirdst_runs)
-ed<-ed[,.(common_name,scientific_name,species_code,resident,breeding_start,breeding_end)]
-startend<-c("breeding_start","breeding_end")
-ed[ ,(startend):=lapply(.SD,as.character),.SDcols=startend]
-ed[,breeding_start:=ifelse(is.na(breeding_start),"2020-01-01",breeding_start)]
-ed[,breeding_end:=ifelse(is.na(breeding_end),"2020-12-31",breeding_end)]
-ed[,start:=substr(breeding_start,6,10)]
-ed[,end:=substr(breeding_end,6,10)]
-ed[,species:=scientific_name]
+#ed<-as.data.table(ebirdst_runs)
+#ed<-ed[,.(common_name,scientific_name,species_code,resident,breeding_start,breeding_end)]
+#startend<-c("breeding_start","breeding_end")
+#ed[ ,(startend):=lapply(.SD,as.character),.SDcols=startend]
+#ed[,breeding_start:=ifelse(is.na(breeding_start),"2020-01-01",breeding_start)]
+#ed[,breeding_end:=ifelse(is.na(breeding_end),"2020-12-31",breeding_end)]
+#ed[,start:=substr(breeding_start,6,10)]
+#ed[,end:=substr(breeding_end,6,10)]
+#ed[,species:=scientific_name]
 
-sdm<-rast(paste0("C:/Users/God/Downloads/","Setophaga_americana","_birds.tif"))
-na<-st_read(list.files("C:/Users/God/Documents/predictors_sdm",pattern="na.shp",full=TRUE))
+sdm<-rast(paste0("/data/sdm_rbq/rasters/","Setophaga_americana","_birds.tif"))
+na<-st_read("/data/predictors_sdm/na.shp")
 na<-st_transform(na,st_crs(sdm))
 coast<-st_union(na)
-nalakes<-st_read("C:/Users/God/Documents/predictors_sdm/nalakes.gpkg")
+nalakes<-st_read("/data/predictors_sdm/nalakes.gpkg")
 nalakes<-st_transform(nalakes,st_crs(na))
 areas<-as.numeric(st_area(nalakes))
 ke<-paste(c("Manicouagan","-Jean"),collapse="|")
 nalakes<-nalakes[unique(c(rev(order(areas))[1:50],grep(ke,nalakes$name_fr))),]
 
-x<-do.call("rbind",lapply(names(pics),function(i){
+gbif<-do.call("rbind",lapply(names(pics),function(i){
   o<-occ_search(scientificName=gsub("_"," ",i),hasCoordinate=TRUE,limit=1000,month="6,7")
   keep<-c("species","decimalLongitude","decimalLatitude")
   x<-o$data[,keep]
@@ -1281,7 +1373,7 @@ x<-do.call("rbind",lapply(names(pics),function(i){
   x$sp<-gsub(" ","_",x$species)
   x
 }))
-x<-x[na,]
+gbif<-gbif[na,]
 
 .image_scale2<-
   function (z, col, breaks = NULL, key.pos, add.axis = TRUE, at = NULL,labels = NULL, 
@@ -1359,29 +1451,27 @@ roundCorners<-function(im,rounding=0.05,corners=1:4){
   #im<-image_scale(im,"300")
   w<-image_info(im)$width
   h<-image_info(im)$height
-  mask <- image_graph(width = w, height = h, res = 96)
-  par(mar=c(0,0,0,0))
-  plot(0:1,0:1,type="n",xaxt="n",yaxt="n",bty="n",bg="magenta")
-  dev.off()
-  mask <- image_draw(mask)
+  #mask <- image_graph(width = w, height = h, res = 96)
+  #par(mar=c(0,0,0,0))
+  #plot(0:1,0:1,type="n",xaxt="n",yaxt="n",bty="n",bg="white")
+  #dev.off()
+  #mask <- image_draw(mask)
+  mask <- image_draw(image_blank(w,h))
   roundedRect(0,h,w,0,rounding=rounding,col="black",corners=corners)
   dev.off()
-  res<-image_composite(mask, im, "plus")
+  #res<-image_composite(mask, im, "plus")
+  res<-image_composite(im, mask, "copyopacity")
+  #res<-image_fill(res,"none",point="+1+1",fuzz=2)
   res
 }
-#roundCorners(image_scale(maps2,"x400"))
 
+#sp<-image_read("/data/sdm_rbq/pics/Setophaga_virens_map.png")
+#sp<-image_crop(sp,"600x600")
+#plot(sp)
+#plot(roundCorners(sp,rounding=0.25))
 
 roundIm<-function(url,file,path,open=FALSE){
-  mask <- image_graph(width = 400, height = 400, res = 96)
-  par(mar=c(0,0,0,0))
-  plot(1,1,type="n",xaxt="n",yaxt="n",bty="n")
-  dev.off()
-  mask <- image_draw(mask)
-  symbols(200,200,circles=198,bg=1,inches=FALSE,add=TRUE)
-  dev.off()
   im <- image_read(url)
-  #im<-image_scale(im,"200")
   wh<-c(image_info(im)$width,image_info(im)$height)
   mi<- min(wh)
   wm<-which.max(wh)
@@ -1393,18 +1483,20 @@ roundIm<-function(url,file,path,open=FALSE){
     }
   }
   im<-image_crop(im, geometry=geom,repage=TRUE)
-  mask<-image_scale(mask, as.character(image_info(im)$height))
-  organism<-image_composite(mask, im, "plus") 
-  organism<-image_scale(organism,"500")
+  wh<-c(image_info(im)$width,image_info(im)$height)
+  mask <- image_draw(image_blank(wh[1],wh[2]))
+  symbols(wh[1]/2,wh[2]/2,circles=(wh[1]/2)-2,bg="#000000",inches=FALSE,add=TRUE)
+  dev.off()
+  organism<-image_composite(im,mask, operator="copyopacity") 
   organim<-image_trim(organism)
   h<-image_info(organism)$height
-  organism<-image_border(organism,"#FFFFFF","50x50")
-  organism<-image_fill(organism,"none",point="+5+5",fuzz=5)
-  organism<-image_draw(organism)
-  symbols(image_info(organism)$height/2,image_info(organism)$width/2,circles=h/2,bg="transparent",fg="grey99",inches=FALSE,lwd=20,add=TRUE)
-  dev.off()
-  organim<-image_trim(organism,fuzz=50)
-  image_write(organism,file.path(path,paste0(file,".png")))
+  organism<-image_border(organism,"grey95","50x50",operator="over")
+  #organism<-image_draw(organism)
+  #symbols(image_info(organism)$height/2,image_info(organism)$width/2,circles=h/2,bg="transparent",fg="grey99",inches=FALSE,lwd=20,add=TRUE)
+  #dev.off()
+  organim<-image_trim(organism,fuzz=0)
+  organism<-image_fill(organism,"none",point="+5+5",fuzz=2)
+  image_write(organism,file.path(path,paste0(file,"_pic.png")),format="png")
 }
 
 lapply(seq_along(pics),function(i){
@@ -1413,28 +1505,21 @@ lapply(seq_along(pics),function(i){
 
 
 
-#im1<-image_read("C:/Users/God/Downloads/visual_abstract.png")
-#im2<-image_read("C:/Users/God/Downloads/organism.png")
-#im2<-image_scale(im2,"x225")
-#im<-image_composite(im1, im2, gravity="northwest",offset="+20+350")
-#image_write(im,"C:/Users/God/Downloads/compo.png")
-
-
 lapply(names(pics),function(i){
-  sdm<-rast(paste0("C:/Users/God/Downloads/",i,"_birds.tif"))
+  sdm<-rast(paste0("/data/sdm_rbq/rasters/",i,"_birds.tif"))
   png(file.path(path,paste0(i,"_map.png")),width=4,height=4,res=400,units="in")
   plot(sdm$mean,col=colo.scale(1:200,colmean),mar=c(0,6,0,0),bty="n",axes=FALSE,legend=FALSE)
   plot(st_geometry(na),border="white",lwd=0.1,add=TRUE)
   plot(st_geometry(nalakes),col="white",border=adjustcolor("black",0.15),lwd=0.1,add=TRUE)
   plot(st_geometry(coast),lwd=0.1,border=gray(0,0.45),add=TRUE)
-  plot(st_geometry(x[x$sp==i,]),pch=16,lwd=0.25,cex=0.15,col="grey1",add=TRUE)
+  plot(st_geometry(gbif[gbif$sp==i,]),pch=16,lwd=0.25,cex=0.15,col="grey1",add=TRUE)
   dev.off()
   png(file.path(path,paste0(i,"_sd.png")),width=4,height=4,res=400,units="in")
   plot(sdm$linksd,col=colo.scale(1:200,colmean),mar=c(0,6,0,0),bty="n",axes=FALSE,legend=FALSE)
   plot(st_geometry(na),border="white",lwd=0.1,add=TRUE)
   plot(st_geometry(nalakes),col="white",border=adjustcolor("black",0.15),lwd=0.1,add=TRUE)
   plot(st_geometry(coast),lwd=0.1,border=gray(0,0.45),add=TRUE)
-  plot(st_geometry(x[x$sp==i,]),pch=16,lwd=0.25,cex=0.15,col="grey1",add=TRUE)
+  plot(st_geometry(gbif[gbif$sp==i,]),pch=16,lwd=0.25,cex=0.15,col="grey1",add=TRUE)
   dev.off()
   map<-image_read(file.path(path,paste0(i,"_map.png")))
   map<-image_trim(map)
@@ -1447,7 +1532,9 @@ lapply(names(pics),function(i){
   lsd<-image_fill(lsd, "#FFFFFF00", point = "+5+5", fuzz = 0)
   map<-image_composite(map, lsd, gravity="west",offset="+0-60")
   im<-image_border(map,"white","20x20")
-  hi<-image_trim(image_read(file.path(path,"overlap.png")))
+  o<-overlapHist(sp="Setophaga tigrina")
+  hi<-image_trim(image_read(o$path))
+  #hi<-image_trim(image_read(file.path("/data/sdm_rbq/graphics","overlap.png")))
   hi<-image_scale(hi,"x350")
   hi<-image_fill(hi,"#FFFFFF00", point = "+1+1", fuzz = 1)
   im<-image_composite(im, hi, gravity="southwest",offset="+15+15")
@@ -1455,25 +1542,27 @@ lapply(names(pics),function(i){
   sp<-image_read(file.path(path,paste0(i,".png")))
   sp<-image_scale(sp,"x350")
   #im<-image_border(im,"white","10x10")
-  im<-image_composite(im, sp, gravity="northeast",offset="+1+10")
+  im<-image_composite(im, sp, gravity="northeast",offset="+1+1")
   im<-image_fill(im,"lemonchiffon2", point = "+5+5", fuzz = 1) # palegoldenrod or lavender
   text<-gsub("_"," ",i)
-  im<-image_annotate(im,"SD",size=50,color="grey40",strokecolor="white",gravity="west",location="+40-100",degrees=0,weight=700)
+  im<-image_annotate(im,"SD",size=50,color="grey40",gravity="west",location="+40-100",degrees=0,weight=700)
   m<-match(text,ed$scientific_name)
   dates<-paste(format(as.Date(c(ed$breeding_start[m],ed$breeding_end[m])),"%b %d"),collapse=" - ")
-  im<-image_annotate(im,paste(" ",paste(text,dates,sep=" / ")," "),size=60,color="grey1",strokecolor="white",gravity="northwest",location="+0+0",degrees=0,weight=700,boxcolor=adjustcolor("white",0.5))
-  im<-image_annotate(im,"re = 0.94",size=60,color="grey40",strokecolor="white",gravity="northwest",location="+15+95",degrees=0,weight=700,boxcolor="none")
-  im<-image_annotate(im,"n = 213",size=60,color="grey40",strokecolor="white",gravity="northwest",location="+15+163",degrees=0,weight=700,boxcolor="none")
+  im<-image_annotate(im,text,size=70,color="grey1",gravity="northwest",location="+30+15",degrees=0,weight=700,boxcolor=adjustcolor("white",0.005))
+  im<-image_annotate(im,dates,size=50,color="grey40",gravity="northwest",location="+30+115",degrees=0,weight=700,boxcolor="none")
+  im<-image_annotate(im,"n = 213",size=50,color="grey40",gravity="northwest",location="+30+175",degrees=0,weight=700,boxcolor="none")
+  im<-image_annotate(im,"re = 0.94",size=50,color="grey40",gravity="northwest",location="+30+235",degrees=0,weight=700,boxcolor="none")
+
   
   ### scale
   #vals<-seq(min(values(sdm$mean),na.rm=TRUE),max(values(sdm$mean),na.rm=TRUE),length.out=200)
   vals<-seq(min(values(sdm$mean),na.rm=TRUE),max(values(sdm$mean),na.rm=TRUE),length.out=200)
   vals<-vals/max(vals)
-  png(paste0("C:/Users/God/Downloads/",i,"_scale.png"),width=1.5,height=20,units="in",res=400)
+  png(file.path(path,paste0(i,"_scale.png")),width=1.5,height=20,units="in",res=400)
   par(bg="lemonchiffon2")
   .image_scale2(vals,colo.scale(vals,colmean),key.length=0.9,key.pos=4,add=TRUE)
   dev.off()
-  sc<-image_read(paste0("C:/Users/God/Downloads/",i,"_scale.png"))
+  sc<-image_read(file.path(path,paste0(i,"_scale.png")))
   sc<-image_trim(sc)
   sc<-image_scale(sc,"x500")
   #image_write(sc,paste0("C:/Users/God/Downloads/",i,"_scale.png"))
@@ -1481,21 +1570,23 @@ lapply(names(pics),function(i){
   im<-image_composite(im,sc,gravity="southeast",offset="+30+50")
   
   im<-roundCorners(im,corners=c(1,3:4))
-  im<-image_border(im,"white","20x20")
-  image_write(im,file.path(path,paste0(i,"_map.png")))
+  #im<-image_border(im,"white","20x20")
+  image_write(im,file.path(path,paste0(i,"_map.png")),format="png")
   #file.show(file.path(path,paste0(i,"_maps.png")))
 })
 
 
 ims<-do.call("c",lapply(names(pics),function(i){
-  image_read(file.path(path,paste0(i,"_map.png")))
+  im<-image_read(file.path(path,paste0(i,"_map.png")))
+  im<-image_background(im,"white")
+  im<-image_border(im,"white","20x20")
 }))
 im1<-image_append(ims[1:3],stack=TRUE)
 im2<-image_append(ims[4:6],stack=TRUE)
 maps<-image_append(c(im1,im2),stack=FALSE)
 maps<-image_border(maps,"white","20x20")
-image_write(maps,file.path(path,"maps.png"))
-file.show(file.path(path,"maps.png"))
+image_write(maps,file.path("/data/sdm_rbq/graphics","bird_maps.png"))
+#file.show(file.path(path,"maps.png"))
 
 
 #maps2<-image_fill(maps, "red", point = "+5+5", fuzz = 1)
@@ -1526,29 +1617,34 @@ file.show(file.path(path,"maps.png"))
 
 #list.files(tools::R_user_dir("ebirdst"),recursive=TRUE)
 #options(vsc.dev.args = list(width = 1500, height = 800))
-colmean<-c("#CCCCCC","#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00","darkorange")
-colmean<-colo.scale(1:200,colmean)
-coast<-st_union(na)
+#colmean<-c("#CCCCCC","#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00","darkorange")
+#colmean<-colo.scale(1:200,colmean)
+#coast<-st_union(na)
 
-naplot<-function(){
-  plot(st_geometry(na),border="white",lwd=0.25,add=TRUE)
-  plot(st_geometry(nalakes),col="white",border=adjustcolor("black",0.15),lwd=0.25,add=TRUE)
-  plot(st_geometry(coast),lwd=0.25,border=gray(0,0.45),add=TRUE)
-}
+#naplot<-function(){
+#  plot(st_geometry(na),border="white",lwd=0.25,add=TRUE)
+#  plot(st_geometry(nalakes),col="white",border=adjustcolor("black",0.15),lwd=0.25,add=TRUE)
+#  plot(st_geometry(coast),lwd=0.25,border=gray(0,0.45),add=TRUE)
+#}
 
 df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
 spc<-df$species[which(df$I>=0.75 & df$I<=0.95 & df$reach>=0.85 & df$n>=100)]
 spc
 
-lsp<-sort(unique(df$species))
+lsp<-unique(df$species)#[1]
+i<-"Dendrocygna autumnalis"
 
 #for(i in lsp[1:10]){
 cl<-makeCluster(5)
 registerDoParallel(cl)
-foreach(i=lsp,.packages=c("sf","terra","magick")) %dopar% {
+foreach(i=lsp,.packages=c("sf","terra","magick","FRutils","data.table","FNN","colorspace")) %dopar% {
   print(i)
   sp<-i
-  sdm<-rast(file.path("/data/sdm_rbq/rasters",paste0(gsub(" ","_",sp),"_birds.tif")))[[1]]
+  sdm<-rast(file.path("/data/sdm_rbq/rasters",paste0(gsub(" ","_",sp),"_birds.tif")))[["mean"]]
+  linkmean<-rast(file.path("/data/sdm_rbq/rasters",paste0(gsub(" ","_",sp),"_birds.tif")))[["linkmean"]]
+  linksd<-rast(file.path("/data/sdm_rbq/rasters",paste0(gsub(" ","_",sp),"_birds.tif")))[["linksd"]]
+  spacemean<-rast(file.path("/data/sdm_rbq/rasters",paste0(gsub(" ","_",sp),"_birds.tif")))[["spacemean"]]
+  predmean<-exp(linkmean-spacemean)
   ebirdpath<-file.path("/data/predictors_sdm/expert_maps/eBird/abundance",paste0(gsub(" ","_",sp),"_ebird2.tif"))
   if(file.exists(ebirdpath)){  
     ebird<-rast(ebirdpath)
@@ -1556,36 +1652,117 @@ foreach(i=lsp,.packages=c("sf","terra","magick")) %dopar% {
     return(NULL) #next
   }
 
-  fname<-paste0(gsub(" ","_",sp),"_comp")
+  fname<-gsub(" ","_",sp)
+  colspacemean<-colo.scale(seq(min(values(spacemean),na.rm=TRUE),max(values(spacemean),na.rm=TRUE),length.out=200),c("grey20","blue4","dodgerblue",colmean[1],"tomato2","red4","grey20"),center=TRUE)
+   colssd<-rev(sequential_hcl(5, palette = "Greens"))
+   colssd[1]<-colmean[1]
+   colssd<-colo.scale(1:200,c(colssd,"black"))
 
-  png(file.path("/data/sdm_rbq/temp",paste0(fname,"1.png")),width=5,height=5,res=400,units="in")
+  xy=c(0.91,0.42)
+  height=0.37
+  cex=0.75
+
+
+  png(file.path("/data/sdm_rbq/temp",paste0(fname,"_obs.png")),width=5,height=5,res=400,units="in")
+  plot((sdm)^(1/1),col=colmean[1],mar=c(0,0,0,0),legend=FALSE,axes=FALSE)
+  naplot()
+  plot(st_geometry(getobs(sp)),pch=16,cex=0.9,col=adjustcolor(colmean[95],0.5),add=TRUE)
+  dev.off()
+  png(file.path("/data/sdm_rbq/temp",paste0(fname,"_sdm.png")),width=5,height=5,res=400,units="in")
   plot((sdm)^(1/1),col=colmean,mar=c(0,0,0,0),legend=FALSE,axes=FALSE)
   naplot()
+  vals<-values(sdm)
+  coloScale(vals=vals,cols=colmean,xy=xy,height=height,cex=cex)
   dev.off()
-  png(file.path("/data/sdm_rbq/temp",paste0(fname,"2.png")),width=5,height=5,res=400,units="in")
-  plot((ebird)^(1/2),col=colmean,mar=c(0,0,0,0),legend=FALSE,axes=FALSE)
+  expo<-1/2
+  ebird2<-aggregate(ebird,9,na.rm=TRUE)^expo
+  #ebird2<-ebird;expo<-1/1
+  png(file.path("/data/sdm_rbq/temp",paste0(fname,"_ebird.png")),width=5,height=5,res=400,units="in")
+  plot(ebird2,col=colmean,mar=c(0,0,0,0),legend=FALSE,axes=FALSE)
   naplot()
+  vals<-range(values(ebird2),na.rm=TRUE)^expo
+  at<-pretty(vals)
+  at<-at[at>=min(vals) & at<=max(vals)]
+  #at<-unique(sort(c(vals,at)))
+  labels<-round(at^(1/expo),1)
+  coloScale(vals=vals,cols=colmean,xy=xy,height=height,cex=cex,at=at,labels=labels)
+  dev.off()
+  png(file.path("/data/sdm_rbq/temp",paste0(fname,"_sd.png")),width=5,height=5,res=400,units="in")
+  plot((linksd)^(1/1),col=colssd,mar=c(0,0,0,0),legend=FALSE,axes=FALSE)
+  naplot()
+  vals<-values(linksd)
+  coloScale(vals=vals,cols=colssd,xy=xy,height=height,cex=cex)
+  dev.off()
+  png(file.path("/data/sdm_rbq/temp",paste0(fname,"_pred.png")),width=5,height=5,res=400,units="in")
+  plot((predmean)^(1/1),col=colmean,mar=c(0,0,0,0),legend=FALSE,axes=FALSE)
+  naplot()
+  vals<-values(predmean)
+  coloScale(vals=vals,cols=colmean,xy=xy,height=height,cex=cex)
+  dev.off()
+  png(file.path("/data/sdm_rbq/temp",paste0(fname,"_spatial.png")),width=5,height=5,res=400,units="in")
+  plot((spacemean)^(1/1),col=colspacemean,mar=c(0,0,0,0),legend=FALSE,axes=FALSE)
+  naplot()
+  vals<-values(spacemean)
+  coloScale(vals=vals,cols=colspacemean,xy=xy,height=height,cex=cex)
   dev.off()
 
-  im1<-image_trim(image_read(file.path("/data/sdm_rbq/temp",paste0(fname,"1.png"))))
-  im1<-image_border(im1,"white","2000")
-  im2<-image_trim(image_read(file.path("/data/sdm_rbq/temp",paste0(fname,"2.png"))))
-  im2<-image_fill(im2,"#FFFFFF00","+1+1")
-  im<-image_composite(im1,im2,gravity="center",offset="+1600+0")
+
+  if(FALSE){
+  im<-image_trim(image_read(file.path("/data/sdm_rbq/temp",paste0(fname,"_obs.png"))))
+  im<-image_border(im,"white","1600")
+  im2<-image_trim(image_read(file.path("/data/sdm_rbq/temp",paste0(fname,"_sdm.png"))))
+  im2<-image_fill(im2,"#FFFFFF00","+5+5")
+  im<-image_composite(im,im2,gravity="east",offset="+0+0")
   im<-image_trim(im)
+  im<-image_border(im,"white","1600")
+  im3<-image_trim(image_read(file.path("/data/sdm_rbq/temp",paste0(fname,"_ebird.png"))))
+  im3<-image_fill(im3,"#FFFFFF00","+5+5")
+  im<-image_composite(im,im3,gravity="east",offset="+0+0")
+  im<-image_trim(im)
+  im<-image_border(im,"white","1600")
+  im4<-image_trim(image_read(file.path("/data/sdm_rbq/temp",paste0(fname,"_sd.png"))))
+  im4<-image_fill(im4,"#FFFFFF00","+5+5")
+  im<-image_composite(im,im4,gravity="east",offset="+0+0")
+  im<-image_trim(im)
+  im<-image_border(im,"white","1600")
+  im5<-image_trim(image_read(file.path("/data/sdm_rbq/temp",paste0(fname,"_spatial.png"))))
+  im5<-image_fill(im5,"#FFFFFF00","+5+5")
+  im<-image_composite(im,im5,gravity="east",offset="+0+0")
+  im<-image_trim(im)
+
   im<-image_border(im,"white","50x50")
   im<-image_annotate(im,sp,size=120,color="black",gravity="northwest",location="+10+10",boxcolor="#FFFFFFAA",degrees=0,weight=700)
   m<-match(sp,df$species)
   im<-image_annotate(im,paste0("n = ",df$n[m]),size=80,color="black",gravity="west",location="+10-100",degrees=0,weight=700)
   im<-image_annotate(im,paste0("reach = ",round(df$reach,2)[m]),size=80,color="black",gravity="west",location="+10+0",degrees=0,weight=700)
-  im<-image_annotate(im,paste0("cor = ",round(df$correlation[m],2)),size=80,color="black",gravity="west",location="+10+100",degrees=0,weight=700)
+  im<-image_annotate(im,paste0("cor = ",round(df$pearson[m],2)),size=80,color="black",gravity="west",location="+10+100",degrees=0,weight=700)
   im<-image_annotate(im,paste0("I = ",round(df$I[m],2)),size=80,color="black",gravity="west",location="+10+200",degrees=0,weight=700)
   im<-image_annotate(im,"mapSpecies",size=100,color="#00000044",gravity="northwest",location="+750+300",boxcolor="#FFFFFFAA",degrees=0,weight=700)
   im<-image_annotate(im,"eBird",size=100,color="#00000044",gravity="northwest",location="+2550+300",boxcolor="#FFFFFFAA",degrees=0,weight=700)
   im<-image_scale(im,"x500")
-  image_write(im,file.path("/data/sdm_rbq/comparison",paste0(gsub(" ","_",sp),"_comparison.png")))
+  image_write(im,file.path("/data/sdm_rbq/comparison",paste0(fname,"_comparison.png")))
+  }
 }
 stopCluster(cl)
+
+#xx<-list.files("/data/sdm_rbq/temp",full=TRUE)
+#o<-rev(order(file.info(xx)$mtime))
+#head(xx[o])
+
+cl<-makeCluster(25)
+registerDoParallel(cl)
+"/data/sdm_rbq/temp"
+lsp<-list.files("/data/sdm_rbq/temp",full=TRUE)
+lsp<-lsp[-grep("_small.",lsp)]
+lsp<-lsp[grep("Dendrocygna",lsp)]
+foreach(i=lsp,.packages=c("magick")) %dopar% {
+  image_write(image_scale(image_read(i),"500"),gsub(".png","_small.png",i))
+}
+stopCluster(cl)
+  #ebird2<-aggregate(ebird,9)
+
+
+
 
 
 ##########################################################
@@ -1608,3 +1785,142 @@ png("/data/sdm_rbq/graphics/stacked_uncertainty.png",width=6,height=5,res=400,un
 plot(gsd,col=c(rev(magma(100)),gray((0:200)/200)),mar=c(0,0,0,4),bty="n",axes=FALSE,legend=TRUE)
 naplot()
 dev.off()
+
+
+#########################################################
+#########################################################
+#########################################################
+### Plot spatial field ##################################
+#########################################################
+#########################################################
+#########################################################
+
+#sp<-"Spinus psaltria"
+sp<-"Strix occidentalis"
+roundIm(url="https://inaturalist-open-data.s3.amazonaws.com/photos/207545449/original.jpg",file=gsub(" ","_",sp),path="/data/sdm_rbq/pics",open=FALSE)
+
+
+sdm<-rast(file.path("/data/sdm_rbq/rasters",paste0(gsub(" ","_",sp),"_birds.tif")))
+abundance<-sdm[["mean"]]
+effects<-exp(sdm[["linkmean"]]-sdm[["spacemean"]])
+spatial<-sdm[["spacemean"]]
+colspatial<-colo.scale(seq(min(values(spatial),na.rm=TRUE),max(values(spatial),na.rm=TRUE),length.out=200),c("blue4","dodgerblue",colmean[1],"tomato2","red4"),center=TRUE)
+
+png("/data/sdm_rbq/graphics/spatial_effect.png",width=12,height=4,res=400,units="in")
+par(mfrow=c(1,3))
+plot(effects,col=colmean,mar=c(0,0,0,0),legend=FALSE,axes=FALSE)
+naplot()
+mtext(side=3,line=-4.5,adj=c(0.05),text="Predicted intensity with\nspatial effect removed",font=2,cex=1.5)
+mtext(side=3,line=-8,adj=c(0.95),text="+",font=2,cex=5,xpd=TRUE)
+plot(spatial,col=colspatial,mar=c(0,0,0,0),legend=FALSE,axes=FALSE)
+naplot()
+mtext(side=3,line=-2.5,adj=c(0.05),text="Spatial effect",font=2,cex=1.5)
+mtext(side=3,line=-8,adj=c(0.95),text="=",font=2,cex=5,xpd=TRUE)
+plot(abundance,col=colmean,mar=c(0,0,0,0),legend=FALSE,axes=FALSE)
+naplot()
+mtext(side=3,line=-2.5,adj=c(0.05),text="Predicted intensity",font=2,cex=1.5)
+ dev.off()
+im<-image_read("/data/sdm_rbq/graphics/spatial_effect.png")
+imsp<-image_read(file.path("/data/sdm_rbq/pics",paste0(gsub(" ","_",sp),".png")))
+imsp<-image_scale(imsp,"450")
+image_write(image_composite(im,imsp,gravity="northeast",offset="+10+10"),"/data/sdm_rbq/graphics/spatial_effect.png")
+
+
+###########################################################
+###########################################################
+### Check accuracy ########################################
+###########################################################
+###########################################################
+
+
+#https://www.inaturalist.org/observations?taxon_id=19959&acc_below_or_unknwon=1100000&place_id=any
+
+d[,.(minacc=min(coordinateUncertaintyInMeters,na.rm=TRUE)),by=species][rev(order(minacc)),][1:100,]
+spe<-"Tympanuchus cupido"
+hist(d$coordinateUncertaintyInMeters[d$species==spe])
+x<-st_as_sf(d[species==spe,],coords=c("x","y"),crs=st_crs(na))
+x<-x[order(x$coordinateUncertaintyInMeters),]
+#plot(st_geometry(na))
+plot(st_geometry(x[x$coordinateUncertaintyInMeters!=10000,]),add=FALSE,col="black",cex=2)
+plot(st_geometry(x[x$coordinateUncertaintyInMeters==10000,]),add=TRUE,col="red",cex=2,pch=1,lwd=3)
+plot(st_geometry(na),add=TRUE)
+
+
+##########################################################
+##########################################################
+### Show effort role #####################################
+##########################################################
+##########################################################
+
+#sp<-"Spinus psaltria"
+sp<-"Strix occidentalis"
+#roundIm(url="https://inaturalist-open-data.s3.amazonaws.com/photos/207545449/original.jpg",file=gsub(" ","_",sp),path="/data/sdm_rbq/pics",open=FALSE)
+
+
+sdm1<-rast(file.path("/data/sdm_rbq/rasters",paste0(gsub(" ","_",sp),"_birds.tif")))[["mean"]]
+sdm2<-rast(file.path("/data/sdm_rbq/rasters",paste0(gsub(" ","_",sp),"_birds_nospecieseff.tif")))[["mean"]]
+sdm3<-rast(file.path("/data/sdm_rbq/rasters",paste0(gsub(" ","_",sp),"_birds_noeff.tif")))[["mean"]]
+
+sdm4<-sdm1
+sdm4[sdm4<(0.05*global(sdm4,"max",na.rm=TRUE))[1,1]]<-NA
+sdm4<-trim(sdm4)
+ex<-ext(vect(st_buffer(st_as_sfc(st_bbox(sdm4)),200)))
+
+sdm<-crop(c(sdm1,sdm2,sdm3),ex)
+
+png("/data/sdm_rbq/graphics/effort_effect.png",width=12,height=4,res=400,units="in")
+par(mfrow=c(1,3))
+plot(sdm[[3]],col=colmean,mar=c(1,1,4,4),legend=TRUE,axes=FALSE)
+naplot()
+mtext(side=3,line=0,adj=c(0.05),text="Effort not taken\ninto account",font=2,cex=1.5)
+plot(sdm[[2]],col=colmean,mar=c(1,1,4,4),legend=TRUE,axes=FALSE)
+naplot()
+mtext(side=3,line=0,adj=c(0.05),text="Effort without\nspecies-specific adjustment",font=2,cex=1.5)
+plot(sdm[[1]],col=colmean,mar=c(1,1,4,4),legend=TRUE,axes=FALSE)
+naplot()
+mtext(side=3,line=0,adj=c(0.05),text="Effort with\nspecies-specific adjustment",font=2,cex=1.5)
+dev.off()
+
+
+########################################################
+########################################################
+###
+########################################################
+########################################################
+
+hull<-image_trim(image_read(file.path("/data/sdm_rbq/stab",paste0(gsub(" ","_","Spizella pallida"),"_asym.png"))))
+
+over<-image_trim(image_read(file.path("/data/sdm_rbq/overlap",paste0(gsub(" ","_","Setophaga tigrina"),"_overlap.png"))))
+over<-image_fill(over,"#FFFFFF00","+5+5")
+plot(im)
+
+
+
+  obs<-image_trim(image_read(file.path("/data/sdm_rbq/temp",paste0(fname,"1.png"))))
+  im<-image_border(im,"white","1600")
+  sdm<-image_trim(image_read(file.path("/data/sdm_rbq/temp",paste0(fname,"2.png"))))
+  im2<-image_fill(im2,"#FFFFFF00","+5+5")
+  im<-image_composite(im,im2,gravity="east",offset="+0+0")
+  im<-image_trim(im)
+  im<-image_border(im,"white","1600")
+  ebird<-image_trim(image_read(file.path("/data/sdm_rbq/temp",paste0(fname,"3.png"))))
+  im3<-image_fill(im3,"#FFFFFF00","+5+5")
+  im<-image_composite(im,im3,gravity="east",offset="+0+0")
+  im<-image_trim(im)
+  im<-image_border(im,"white","1600")
+  unc<-image_trim(image_read(file.path("/data/sdm_rbq/temp",paste0(fname,"4.png"))))
+  im4<-image_fill(im4,"#FFFFFF00","+5+5")
+  im<-image_composite(im,im4,gravity="east",offset="+0+0")
+  im<-image_trim(im)
+  im<-image_border(im,"white","1600")
+  spatial<-image_trim(image_read(file.path("/data/sdm_rbq/temp",paste0(fname,"5.png"))))
+  im5<-image_fill(im5,"#FFFFFF00","+5+5")
+  im<-image_composite(im,im5,gravity="east",offset="+0+0")
+  im<-image_trim(im)
+
+
+im1<-image_append(c(obs,sdm,ebird),stack=FALSE)
+im2<-image_append(c(hull,unc,over),stack=FALSE)
+im<-image_append(c(im1,im2),stack=TRUE)
+
+image_write(spatial,"/data/sdm_rbq/graphics/p7_im.png")

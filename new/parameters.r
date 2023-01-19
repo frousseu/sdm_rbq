@@ -50,7 +50,7 @@ dev.off()
 
 
 checkpoint("Weights")
-plan(multicore,workers=15)
+plan(multicore,workers=5)
 weights <- ppWeight(sPoly = region, mesh = Mesh)
 dmesh <- attributes(weights)$dmesh
 dmesh$areas<-weights
@@ -68,6 +68,7 @@ r<-r[[substr(names(r),1,3)!="eco"]]
 #r<-extend(r,ext(vect(st_buffer(mesh,50))))
 #mesh<-st_convex_hull(st_buffer(st_union(st_as_sf(as.data.frame(Mesh$loc)[,1:2],coords=1:2)),50))
 r<-extend(r,extend(ext(dmesh),res(r)))
+crsr<-crs(r)
 
 #########################################################
 ### Extend predictors to mesh ###########################
@@ -114,7 +115,7 @@ gc()
 ### Extract predictors ###############################
 ### extract predictors to mesh
 checkpoint("Extracting predictors for dual mesh cells")
-plan(multicore,workers=15)
+plan(multicore,workers=10)
 cores<-nbrOfWorkers() # get nbr of workers from the chosen plan
 chunks <- split(1:nrow(dmesh), rep(1:cores, each=ceiling(nrow(dmesh)/cores))[1:nrow(dmesh)])
 options(future.globals.maxSize = 1000 * 1024 ^ 2)
@@ -137,31 +138,31 @@ checkpoint("Done")
 ###############################################
 ### Add distance to coast
 
-coast<-st_as_sfc(st_bbox(r))
-coast<-st_difference(coast,st_union(na))
-dis<-st_distance(coast,st_centroid(dmesh))
+sea<-st_as_sfc(st_bbox(r))
+sea<-st_difference(sea,st_union(na))
+dis<-st_distance(sea,st_centroid(dmesh))
 distance<-as.numeric(dis[1,])
 logdistance<-log(distance+1,base=10)
 
-distance<-(distance-mean(distance))/sd(distance)
-adds<-matrix(mean(distance),ncol=1)
-colnames(adds)<-colnames(means)
-rownames(adds)<-"distance"
-means<-rbind(means,adds)
-adds<-matrix(sd(distance),ncol=1)
-colnames(adds)<-colnames(sds)
-rownames(adds)<-"distance"
-sds<-rbind(sds,adds)
+#distance<-(distance-mean(distance))/sd(distance)
+#adds<-matrix(mean(distance),ncol=1)
+#colnames(adds)<-colnames(means)
+#rownames(adds)<-"distance"
+#means<-rbind(means,adds)
+#adds<-matrix(sd(distance),ncol=1)
+#colnames(adds)<-colnames(sds)
+#rownames(adds)<-"distance"
+#sds<-rbind(sds,adds)
 
-logdistance<-(logdistance-mean(logdistance))/sd(logdistance)
-adds<-matrix(mean(logdistance),ncol=1)
-colnames(adds)<-colnames(means)
-rownames(adds)<-"logdistance"
-means<-rbind(means,adds)
-adds<-matrix(sd(logdistance),ncol=1)
-colnames(adds)<-colnames(sds)
-rownames(adds)<-"logdistance"
-sds<-rbind(sds,adds)
+#logdistance<-(logdistance-mean(logdistance))/sd(logdistance)
+#adds<-matrix(mean(logdistance),ncol=1)
+#colnames(adds)<-colnames(means)
+#rownames(adds)<-"logdistance"
+#means<-rbind(means,adds)
+#adds<-matrix(sd(logdistance),ncol=1)
+#colnames(adds)<-colnames(sds)
+#rownames(adds)<-"logdistance"
+#sds<-rbind(sds,adds)
 
 dmeshPred<-cbind(dmeshPred,distance)
 dmeshPred<-cbind(dmeshPred,logdistance)
@@ -170,6 +171,95 @@ dmeshPred<-cbind(dmeshPred,logdistance)
 #plot(dmesh["logdistance"],border=NA,nbreaks=200,reset=FALSE)
 #plot(st_geometry(na),lwd=0.1,add=TRUE)
 #plot(dmesh$distance,dmesh$logdistance)
+
+
+######################################################
+### Scale predictors  ################################
+######################################################
+
+#dmeshPred<-iris[,1:4]
+means<-colMeans(dmeshPred)
+sds<-apply(dmeshPred,2,sd)
+
+Scale<-function(x){
+  (x-mean(x))/sd(x)
+}
+
+backScale<-function(x,var){
+  m<-match(var,names(means))
+  me<-means[m]
+  sd<-sds[m]
+  (x*sd)+me
+}
+
+nps<-colnames(dmeshPred)
+dmeshPred<-do.call("cbind",lapply(colnames(dmeshPred),function(i){
+  Scale(dmeshPred[,i])
+}))
+colnames(dmeshPred)<-nps
+
+
+######################################################
+### Add predictor transformations ####################
+######################################################
+
+### add quadratic terms
+trans<-dmeshPred^2
+colnames(trans)<-paste0(colnames(trans),"2")
+dmeshPred<-cbind(dmeshPred,trans)
+dmeshPred<-dmeshPred[,order(colnames(dmeshPred))]
+
+
+### add interactions with latitude
+int<-colnames(dmeshPred)[!colnames(dmeshPred)%in%c("latitude","latitude2","prec","prec2","tmean","tmean2","sbias")]
+l<-lapply(int,function(i){
+  dmeshPred[,i]*dmeshPred[,"latitude"]
+})
+trans<-do.call("cbind",l)
+colnames(trans)<-paste0(int,".","latitude")
+dmeshPred<-cbind(dmeshPred,trans)
+
+### add interactions with longitude
+int<-colnames(dmeshPred)[grep("conifers|cultivated",colnames(dmeshPred))]
+int<-int[-grep("\\.",int)]
+l<-lapply(int,function(i){
+  dmeshPred[,i]*dmeshPred[,"longitude"]
+})
+trans<-do.call("cbind",l)
+colnames(trans)<-paste0(int,".","longitude")
+dmeshPred<-cbind(dmeshPred,trans)
+
+### add interactions with tmean
+int<-colnames(dmeshPred)[!colnames(dmeshPred)%in%c("latitude","latitude2","longitude","longitude2","tmean","tmean2","sbias")]
+int<-int[-grep("\\.",int)]
+l<-lapply(int,function(i){
+  res<-dmeshPred[,i]*dmeshPred[,c("tmean","tmean2")]
+  colnames(res)<-paste0(i,".",c("tmean","tmean2"))
+  res
+})
+trans<-do.call("cbind",l)
+dmeshPred<-cbind(dmeshPred,trans)
+
+
+### add latlon interactions
+int<-colnames(dmeshPred)[colnames(dmeshPred)%in%c("latitude","latitude2")]
+l<-lapply(int,function(i){
+  res1<-dmeshPred[,"longitude"]*dmeshPred[,i]
+  res2<-dmeshPred[,"longitude2"]*dmeshPred[,i]
+  cbind(res1,res2)
+})
+trans<-do.call("cbind",l)
+colnames(trans)<-c("longitude.latitude","longitude2.latitude","longitude.latitude2","longitude2.latitude2")
+dmeshPred<-cbind(dmeshPred,trans)
+
+
+### add polynomials for tmean (test)
+l<-lapply(3:6,function(i){
+  dmeshPred[,"tmean"]^i
+})
+trans<-do.call("cbind",l)
+colnames(trans)<-paste0("tmean",3:6)
+dmeshPred<-cbind(dmeshPred,trans)
 
 
 
@@ -383,9 +473,9 @@ x$species
 
 
 ### Create result file
-#df<-data.frame(matrix(ncol = 6, nrow = 0))
-#colnames(df)<-c("species","date","n","reach","predictors","correlation","I")
-#write.csv(df,file="/data/sdm_rbq/graphics/mapSpeciesres.csv",row.names=FALSE,append=FALSE)
+#df<-data.frame(matrix(ncol = 10, nrow = 0))
+#colnames(df)<-c("species","date","n","reach","predictors","range","sd","pearson","spearman","I","D")
+#write.table(df,file="/data/sdm_rbq/graphics/mapSpeciesres.csv",row.names=FALSE,header=TRUE,sep=",",append=FALSE)
 #df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
 
 
@@ -414,3 +504,4 @@ if(FALSE){
 }
 
 
+#options(vsc.dev.args = list(width = 1200, height = 600))

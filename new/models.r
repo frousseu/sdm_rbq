@@ -21,7 +21,6 @@ library(viridisLite)
 inla.setOption(pardiso.license = "/home/rouf1703/pardiso.lic")
 
 dims<-dim(r)[1:2]
-crsr<-crs(r)
 
 #cl<-makeCluster(min(2,length(species)))
 #registerDoParallel(cl)
@@ -36,6 +35,7 @@ crsr<-crs(r)
   #.export=c("loccs","bpriors","f","na","predictorsw","em")
 #) %dopar% {
 
+#plan(sequential)
 plan(multisession,workers=min(c(3,length(species))))
 cores<-nbrOfWorkers() # get nbr of workers from the chosen plan
 options(future.globals.maxSize = 5000 * 1024 ^ 2)
@@ -52,6 +52,16 @@ obs<-d[md>=be[1] & md<=be[2],]
 
 ### remove duplicate obs
 obs<-unique(obs,by=c("recordedBy","species","cell"))
+### remove places
+#sb<-st_as_sf(obs,coords=c("x","y"),crs=st_crs(na)) 
+#osb<-st_intersects(sb,na[na$NAME_1%in%c("Ontario","Québec"),])
+#osb<-st_intersects(sb,na[na$NAME_0%in%c("Canada"),])
+#obs<-obs[as.logical(lengths(osb)),]
+#writeRaster(aggregate(sdm[[c("mean","linksd")]],2), filename=paste0("/data/sdm_rbq/Chordeiles_minor.tif"), overwrite=TRUE)
+### keep certain n of obs
+#w<-which(obs$species==sp)
+#w<-setdiff(w,sample(w,min(c(8000,length(w)))))
+#obs<-obs[-w,]
 
 #spobs<-obs[species==sp,]
 #obs<-obs[species!=sp,]
@@ -73,6 +83,13 @@ obs<-unique(obs,by=c("recordedBy","species","cell"))
 
 ### species obs
 spobs<-obs[species==sp,]
+#spobs<-target ### for common nighthawk
+
+
+
+
+#rev(sort(table(spobs$recordedBy)))[1:5]
+#plot(spobs$x[spobs$recordedBy=="Bill Chambers"],spobs$y[spobs$recordedBy=="Bill Chambers"],xlim=c(1935,1940))
 
 nndist<-knn.dist(as.matrix(spobs[,c("x","y")]),k=1)[,1]
 spobs<-spobs[nndist<=1200,]
@@ -132,11 +149,13 @@ dmesh$effoccs<-vals
 #######################################################
 ### Add artificial effort #############################
 # adds an artificial effort value when at a certain distance bdist from concave hull 
-effvalue<-50
-bdist<-500 #500
+effvalue<-20#50
+bdist<-500#500
 buff<-st_buffer(concaveman(st_as_sf(st_cast(st_union(st_as_sf(spobs,coords=c("x","y"),crs=st_crs(na))),"MULTIPOINT"),concavity=2)),bdist)
 o<-!as.logical(lengths(st_intersects(dmesh,buff)))
 dmesh$effoccs[o]<-ifelse(dmesh$effoccs[o]>0,dmesh$effoccs[o],effvalue)
+
+#dmesh$effoccs<-efftarget ### for common night hawk
 
 ########################################################
 ### Models #############################################
@@ -144,13 +163,15 @@ dmesh$effoccs[o]<-ifelse(dmesh$effoccs[o]>0,dmesh$effoccs[o],effvalue)
 ### Remove variables with very low coverage
 
 if(TRUE){
-  x<-unlist(lapply(grep("2|tmean",vars_pool,value=TRUE,invert=TRUE),function(k){
-    x<-backTransform(dmeshPred[,k],k)
+  # remove interactions
+  x<-unlist(lapply(grep("2",vars_pool,value=TRUE,invert=TRUE),function(k){
+    x<-backScale(dmeshPred[,k],k)
     h<-hist(x[dmesh$spobs>0],breaks=seq(min(x),max(x),length.out=100),  plot=FALSE)
     #h$density
-    w<-max(which(h$density>0))
+    w<-range(which(h$density>0))
     #if(sum(h$density[11:length(h$density)])==0){
-    if(h$mids[w]<=0.15){ # removes vars with coverage below 0.15
+    if((length(w[1]:w[2])/length(h$density))<=0.30){ # removes vars with coverage below 0.20
+    #if(h$mids[w]<=0.25){ # removes vars with coverage below 0.15
       k
     }else{
       NULL
@@ -158,6 +179,7 @@ if(TRUE){
     # if max positive value is inferior to 5% or 10% of values, remove this variable
   }))
   if(!is.null(x)){
+    x<-c(x,paste0(x,rep(2,length(x))))
     vars<-vars_pool[!vars_pool%in%x]
   }else{
     vars<-vars_pool
@@ -171,7 +193,7 @@ formula<-f
 sPoints<-st_as_sf(spobs,coords=c("x","y"),crs=crsr)
 #explanaMesh<-explana
 ppWeight<-weights
-prior.range<-c(50,0.01)
+prior.range<-c(100,0.01)
 prior.sigma<-c(1,0.01)
 smooth<-3/2
 num.threads<-4:4
@@ -365,7 +387,9 @@ colmean<-c("#EEEFF0","#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0
 
 checkpoint("Chull reach asymptote?")
 
-rh<-rangeHull(sPoints,species=sp,breaks=200)$reach
+rh<-rangeHull(sPoints,species=sp,breaks=200)
+stabHull(sp,rh=rh)
+rh<-rh$reach
 
 checkpoint("Mapping distribution")
 
@@ -400,54 +424,97 @@ for(i in 1:length(m)){
   mtext(side=3,line=-1,adj=0.05,text=lab,font=2,cex=1.4,col=gray(0,0.3))
   #plot(attributes(weight)$dmesh,add=TRUE,border=gray(1,0.25),lwd=0.2)
   #mf_scale()
-  writeRaster(sdm, filename=paste0("/data/sdm_rbq/rasters/",gsub(" ","_",sp),"_birds.tif"), overwrite=TRUE)
 }
 par(mfrow=c(1,1))
 dev.off()
- 
-print(j) 
 
-list(species=sp,mpp=mpp,spobs=spobs,dmesh=dmesh,n=nrow(spobs),reach=round(rh,5),date=substr(Sys.time(),1,10),predictors=paste(vars,collapse="+"))
+
+writeRaster(sdm, filename=paste0("/data/sdm_rbq/rasters/",gsub(" ","_",sp),"_birds.tif"), overwrite=TRUE)
+ 
+time<-Sys.time()
+attr(time,"tzone")<-"Indian/Reunion"
+res<-list(species=sp,mpp=mpp,spobs=spobs,dmesh=dmesh,n=nrow(spobs),reach=round(rh,5),date=time,predictors=paste(vars,collapse="+"),range=mpp$summary.hyperpar[1,1],sd=mpp$summary.hyperpar[2,1])
+
+### write results
+results<-data.frame(
+    species=res$species,
+    date=res$date,
+    n=res$n,
+    reach=res$reach,
+    predictors=res$predictors,
+    range=res$range,
+    sd=res$sd,
+    pearson=NA,
+    spearman=NA,
+    I=NA,
+    D=NA
+  )
+write.table(results,file="/data/sdm_rbq/graphics/mapSpeciesres.csv",row.names=FALSE,col.names=FALSE,sep=",",append=TRUE)
+
+print(j) 
+res
 
 }, future.packages = "data.table")
 plan(sequential)
 
 
-# write some info
-df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
-add<-do.call("rbind",lapply(ml,function(i){
-  data.frame(
-    species=i$species,
-    date=i$date,
-    n=i$n,
-    reach=i$reach,
-    predictors=i$predictors,
-    correlation=NA,
-    I=NA
-  )
-}))
-df<-rbind(df,add)
+### clear old results
+df<-read.table("/data/sdm_rbq/graphics/mapSpeciesres.csv",sep=",",header=TRUE)
 df<-df[rev(order(df$date)),][!duplicated(df$species),]
-write.csv(df,file="/data/sdm_rbq/graphics/mapSpeciesres.csv",row.names=FALSE,append=FALSE)
+#tz<-as.POSIXct(df$date)
+#attr(tz,"tzone")<-"Indian/Reunion"
+#df$date<-tz
+write.table(df,file="/data/sdm_rbq/graphics/mapSpeciesres.csv",row.names=FALSE,sep=",",append=FALSE)
+
+
+
+#df<-df[,c("species", "date", "n", "reach", "predictors", "range", "sd", "pearson","spearman", "I", "D")]
+#lsps<-gsub("_"," ",gsub("_birds.tif","",basename(list.files("/data/sdm_rbq/rasters",full=TRUE)[which(file.info(list.files("/data/sdm_rbq/rasters",full=TRUE))$mtime>as.POSIXct("2022-11-16"))])))
+#lsps<-lsps[!lsps%in%df$species]
+
+#results<-data.frame(
+#    species=lsps,
+#    date=Sys.time(),
+#    n=NA,
+#    reach=NA,
+#    predictors=NA,
+#    pearson=NA,
+#    spearman=NA,
+#    I=NA,
+#    D=NA
+#  )
+#write.table(results,file="/data/sdm_rbq/graphics/mapSpeciesres.csv",row.names=FALSE,sep=",",append=FALSE)
 
 
 species
-i<-1
+i<-8
 mpp<-ml[[i]]$mpp
 sdm<-rast(paste0("/data/sdm_rbq/rasters/",gsub(" ","_",species[i]),"_birds.tif"))
 occs<-st_as_sf(ml[[i]]$spobs,coords=c("x","y"),crs=crsr)
 dmesh<-ml[[i]]$dmesh
-sdmf<-mapSpace(modelSpace=mpp,dims=round(1*c(1,1)*dims/4,0),sPoly=NULL,sample=FALSE)#[[type]]
+sdmf<-mapSpace(modelSpace=mpp,dims=round(1*c(1,1)*dims/4,0),sPoly=NULL,sample=TRUE)#[[type]]
 
 
 plot(mask(mean(exp(sdmf[[grep("sample",names(sdmf))]])),vect(na)))
+plot(mask(exp(sdmf$sample080),vect(na)))
 
+plot(mask(sdmf$spacemean,vect(na)),col=colmean)
+naplot()
+
+plot(mask(sdmf$mean,vect(na)),col=colo.scale(1:10,colmean))
+naplot()
 
 #####################################
 #####################################
 #####################################
 #####################################
 #####################################
+#####################################
+#####################################
+#####################################
+#####################################
+#####################################
+
 
 library(spatstat.core)
 data(redwood)
