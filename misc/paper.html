@@ -108,13 +108,18 @@ a.text:hover{
   color: black;
 }
 
+.container2 {
+  position: relative;
+  text-align: center;
+  color: black;
+}
 
 .top-left {
   display: flex;
   flex: 1;
   padding: 0vmin;
   margin: 0vmin;
-  <!-- border: 1px solid red; -->
+  /* border: 1px solid red; */
 }
 
 h1 {
@@ -219,7 +224,20 @@ header {
 .container {
   position: relative;
   width: 50%;
-  border: 1px solid red;
+  border: 0px solid red;
+}
+
+.container2 {
+  position: relative;
+  width: 100%;
+  border: 0px solid red;
+  opacity: 1;
+}
+
+.container3 {
+  position: relative;
+  /* width: 50%; */
+  /* border: 1px solid red; */
 }
 
 .image {
@@ -243,6 +261,27 @@ header {
   text-align: center;
 }
 
+.middle2 {
+  opacity: 1;
+  position: absolute;
+  background-color: #FFFFFF00;
+  top: 25%;
+  left: 15%;
+  width: 80%;
+  text-align: left;
+}
+
+.middle3 {
+  opacity: 1;
+  position: absolute;
+  background-color: #FFFFFF00;
+  top: 17%;
+  left: 7%;
+  width: 85%;
+  text-align: left;
+  /* border: 1px solid red; */
+}
+
 .container:hover .image {
   opacity: 0.3;
 }
@@ -260,7 +299,43 @@ header {
   line-height: 1;
 }
 
+.text2 {
+  background-color: #FFFFFF00;
+  color: #00000055;
+  opacity: 1;
+  font-size: 1.75vmin;
+  padding: 1vmin;
+  border-radius: 1vmin;
+  line-height: 1.1;
+  /* text-align:justify; */
+  text-justify:inter-character;
+}
 
+.container2:hover .image2 {
+  opacity: 0.4;
+}
+
+.container2:hover .image3 {
+  opacity: 0.2;
+}
+
+.container2:hover .text2 {
+  color: #000000;
+  background-color: #FFFFFF55;
+}
+
+.container3:hover .image2 {
+  opacity: 0.4;
+}
+
+.container3:hover .image3 {
+  opacity: 0.2;
+}
+
+.container3:hover .text2 {
+  color: #000000;
+  background-color: #FFFFFF55;
+}
 
 </style>
 </head>
@@ -494,6 +569,115 @@ header {
 <h1>SDM from mapSpecies and comparison with eBird</h1>
 
 <p>This page displays the species distribution models obtained with mapSpecies and associated results along with the abundance models from <a class="text" target="blank" href="https://ebird.org">eBird</a> for comparison. All observations used for the mapSpecies models come from <a class="text" target="blank" href="https://www.inaturalist.org">iNaturalist</a> and were obtained through the <a class="text" target="blank" href="https://doi.org/10.15468/ab3s5x">iNaturalist Research-grade Observations</a> dataset hosted on <a class="text" target="blank" href="https://www.gbif.org">GBIF</a>. The eBird models are part of <a class="text"  target="blank" href="https://science.ebird.org/en/status-and-trends">The Status and Trends product</a> <a class="text" target="blank" href="https://doi.org/10.2173/ebirdst.2021">(Fink et al. 2022)</a> and can be accessed through the <a class="text" target="blank" href="https://cornelllabofornithology.github.io/ebirdst/index.html">ebirdst</a> R package. The abundance models from eBird are available online and a link to the ebird model is provided in each species account. The models are either for the breeding period or for the whole year when a species is a resident. The breeding period used for the models is the same as the one used by eBird.</p>
+
+
+<hr class="vspace"> 
+<h2 id="Explanations" class="h2">See below for quick explanations</h2>  
+<!-- <section class="section"></section> -->
+<div class="subheader"></div>
+
+
+<section class="section">
+  <header>
+    <div class="top-left"></div>
+    <div class="top-left">mapSpecies</div>
+    <div class="top-left">
+      <a target="_blank" href="https://science.ebird.org/en/status-and-trends/species/bbwduc/abundance-map?season=breeding&static=true">eBird &#8599</a>
+    </div>
+    <div class="top-left">Overlap (I)</div>
+  </header>
+  <div class="rowshow">
+    <div class="col3" style="width: 20vw; border: 0px solid red;">
+      <!-- <a target="_blank" href="https://www.inaturalist.org/observations/142367503"> -->
+      <div class="container" style="border: 0px solid red;">
+        <a class="aim" target="_blank" href="https://www.inaturalist.org/observations/142367503">
+          <div class="infotop">Breeding period<br>No. of observations used</div>
+          <!-- <a class="aim" target="_blank" href="https://www.inaturalist.org/observations/142367503"> -->
+          <img style="height: 12vw; padding-top: 5%; padding-left: 0%; border: 0px solid green;" src="images/Dendrocygna_autumnalis_pic.png" alt="">
+        <div class="middle" style="border: 0px solid red;">
+          <div class="text" style="border: 0px solid green;">(c) Author of photo<br>Licence<br>Click to see observation<br>on iNaturalist</div>
+        </div>
+        <!-- </a> -->
+        <div class="infobottom"><i>Scientific name</i></div>
+        </a>
+      </div>
+    </div>
+    <div class="col4">
+    <div class="container2">
+      <img class="image2" style="height: 20vw; padding: 0px;" src="images/Dendrocygna_autumnalis_sdm_small.png" alt="">
+      <div class="middle2" style="border: 0px solid red;">
+      <div class="text2" style="border: 0px solid green;">This maps shows the relative intensity predicted by the effort-adjusted Log-Gaussian Cox Process model. Intuitively, the relative intensity can be understood as a relative density surface where high densities indicate a higher number of observations. It is a measure of relative abundance.</div>
+      </div>
+    </div>
+    </div>
+    <div class="col3">
+    <div class="container2">
+      <img class="image2" style="height: 20vw; padding: 0px;" src="images/Dendrocygna_autumnalis_ebird_small.png" alt="">
+      <div class="middle2" style="border: 0px solid red;">
+      <div class="text2" style="border: 0px solid green;">This maps shows the mean number of individual birds detected in an eBird checklist for a period of an hour. It is also a measure of relative abundance. To facilitate visualization, a square root transformation has been applied to the color scale. Click on the link over the map to go to the corresponding eBird species page.</div>
+      </div>
+    </div>
+    </div>
+    <div class="col4">
+    <div class="container2">
+      <img class="image3" style="height: 16vw; padding-top: 20%;" src="images/Dendrocygna_autumnalis_over.png" alt="">
+      <div class="middle2" style="border: 0px solid red;">
+      <div class="text2" style="border: 0px solid green;">This histogram shows the distribution of overlap values between the mapSpecies and the eBird models. A value of 0 indicates completely different distributions and a value of 1 indicates identical distributions. The histrogram show the distributions of values for each species modeled that reached at least 85% of the stabilization hull. The vertical bar shows the overlap value for the focus species.</div>
+      </div>
+    </div>
+    </div>
+  </div>
+</section>
+
+
+
+
+
+<section class="section">
+  <header>
+    <button class="showmore" onclick="showmore('Explanations','panel1')">&nbsp&nbsp&nbsp&nbspObservations and stabilization &#8628</button>
+    <button class="showmore" onclick="showmore('Explanations','panel2')">Predictors only, spatial effect and SD &#8628</button>
+  </header>
+  <div class="row" id="Explanationspanel" style="display: flex;">
+    <div class="col1" id="Explanationspanel1" style="visibility: visible; display: flex;">
+      <div class="container3">
+      <img class="image2" style="height: 13vw; padding: 0px;" src="images/Dendrocygna_autumnalis_obs_small.png" alt="">
+      <div class="middle3" style="border: 0px solid red;">
+      <div class="text2" style="border: 0px solid green;">iNaturalist research-grade observations used for modeling the species distributions.</div>
+      </div>
+      </div>
+      <div class="container3">
+      <img class="image3" style="height: 13vw; padding: 0px;" src="images/Dendrocygna_autumnalis_stab.png" alt="">
+      <div class="middle3" style="border: 0px solid red;">
+      <div class="text2" style="border: 0px solid green;">Shows the stabilization of surface areas of convex hulls around observations when randomly sampling an increasing number of observations. When the curve gets close to the asymptote, it suggests that observations likely cover the range of species.</div>
+      </div>
+      </div>
+    </div>
+    <div class="col2" id="Explanationspanel2" style="visibility: visible; display: flex;">
+      <div class="container3">
+      <img class="image2" style="height: 13vw; padding: 0px;" src="images/Dendrocygna_autumnalis_pred_small.png" alt="">
+      <div class="middle3" style="border: 0px solid red;">
+      <div class="text2" style="border: 0px solid green;">Shows the relative intensity predicted when the spatial component is removed from the predictions. This represents the effects when only the predictors are considered (whitin the context of the spatial model).</div>
+      </div>
+      </div>
+      <div class="container3">
+      <img class="image2" style="height: 13vw; padding: 0px;" src="images/Dendrocygna_autumnalis_spatial_small.png" alt="">
+      <div class="middle3" style="border: 0px solid red;">
+      <div class="text2" style="border: 0px solid green;">Shows the spatial effect of the model. Red shows areas where intensities are higher than expected, conditional on the predictors in the model). Blue areas are where intensities are lower than expected. This value is added to the effect of the predictors to form the linear predictor and than exponentiated to get the predicted intensities.</div>
+      </div>
+      </div>
+      <div class="container3">
+      <img class="image2" style="height: 13vw; padding: 0px;" src="images/Dendrocygna_autumnalis_sd_small.png" alt="">
+      <div class="middle3" style="border: 0px solid red;">
+      <div class="text2" style="border: 0px solid green;">Shows the uncertainty (standard deviation) around predictions on the scale of the linear predictor.</div>
+      </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
 
 
 
