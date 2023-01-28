@@ -4,7 +4,8 @@ library(mapSpecies)
 ### This where the list of species to submit is chosen along with data inputs to the model
 ### 
 species<-c("Setophaga pinus","Setophaga americana","Setophaga petechia","Setophaga citrina","Setophaga ruticilla","Setophaga virens")
-species<-c("Larus argentatus","Thalasseus elegans","Antrostomus vociferus")
+species<-c("Dolichonyx oryzivorus")
+species<-c("Myiarchus crinitus")
 tab<-table(d$species)
 tab<-names(tab)[tab>30]
 tab<-tab[d$ebird[match(tab,d$ebird)]%in%ed$scientific_name]
@@ -12,7 +13,8 @@ set.seed(sample(1:10000,9))
 df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
 dontsp<-df$species[!is.na(df$I)]
 tab<-tab[!tab%in%dontsp]
-species<-sample(tab,9)
+species<-sample(tab,8)
+#species<-df$species[1:17]
 (lspecies<-species)
 d[species%in%lspecies,][,.(n=.N),by=.(species)]
 
@@ -29,7 +31,7 @@ d[species%in%lspecies,][,.(n=.N),by=.(species)]
 #plot(st_geometry(loccs[[1]]),add=TRUE)
 
 
-bpriors<-list(prec=list(default=1/(1)^2,Intercept=1/(20)^2,sbias=1/(20)^2,fixed=1/(20)^2),mean=list(default=0,Intercept=0,sbias=0,fixed=0))
+bpriors<-list(prec=list(default=1/(0.5)^2,Intercept=1/(20)^2,sbias=1/(20)^2,fixed=1/(20)^2),mean=list(default=0,Intercept=0,sbias=0,fixed=0))
 
 #colnames(dmeshPred)<-gsub(",","",colnames(dmeshPred))
 #names(r)<-gsub(",","",names(r))
@@ -41,7 +43,15 @@ vars_pool<-c("tmean","tmean2","broadleafs","builtup","cultivated","herbaceous","
 #vars_pool<-c("tmean","tmean2","broadleafs","builtup","cultivated","herbaceous","forested","shrubs","conifers","harsh","water","logdistance")
 vars_pool<-c("tmean","tmean2","broadleafs","builtup","cultivated","herbaceous","mixed","shrubs","conifers","harsh","water","logdistance")
 
-vars_pool<-c("tmean","tmean2","deciduous_esa","builtup_esa","crop_esa","grass_esa","mixed_esa","shrubs_esa","conifers_esa","harsh_esa","logdistance","elevation")
+vars_pool<-c("tmean","tmean2","deciduous_esa","builtup_esa","crop_esa","grass_esa","mixed_esa","shrubs_esa","conifers_esa","harsh_esa","logdistance","elevation","elevation2")
+
+vars_pool<-c("tmean","tmean2","deciduous_esa","builtup_esa","crop_esa","grass_esa","mixed_esa","shrubs_esa","conifers_esa","logdistance","elevation","elevation2")
+
+vars_pool<-c("tmean","tmean2","deciduous_esa","builtup_esa","crop_esa","grass_esa","mixed_esa","shrubs_esa","conifers_esa","logdistance","elevation")
+
+vars_pool<-c("tmean","tmean2","deciduous_esa","builtup_esa","crop_esa","grass_esa","mixed_esa","shrubs_esa","conifers_esa","logdistance","elevation","elevation2")
+
+#vars_pool<-c("builtup_esa")
 
 #vars_pool<-c("tmean","tmean2")
 
@@ -103,3 +113,7 @@ target<-as.data.table(target) ###
 target<-unique(target,by=c("recordedBy","species","cell"))
 
 }
+
+
+
+

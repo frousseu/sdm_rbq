@@ -10,7 +10,7 @@ library(exiftoolr)
 library(colorspace)
 
 
-options(vsc.dev.args = list(width = 1200, height = 800))
+options(vsc.dev.args = list(width = 1000, height = 800))
 #options(vsc.dev.args = list(width = 1200, height = 1200))
 
 #############################################################
@@ -34,8 +34,8 @@ checkpoint("Marginal effects")
 
 m<-mpp
 class(m)<-"inla"
-nsims<-500
-samples<-inla.posterior.sample(nsims,m)
+nsims<-100
+samples<-inla.posterior.sample(nsims,m,num.threads="2:2")
 
 params<-dimnames(m$model.matrix)[[2]]
 nparams<-sapply(params,function(i){
@@ -96,39 +96,48 @@ preds<-lapply(preds,function(i){
 
 
 png(file.path(getwd(),"graphics","marginal_effects.png"),width=10,height=8,units="in",res=300)
-par(mfrow=n2mfrow(length(preds),asp=2),mar=c(3,2,1,1),oma=c(1,1,1,1))
+par(mfrow=n2mfrow(length(preds)+2,asp=2),mar=c(2.5,1.25,0.5,0.5),oma=c(1,1,5,1))
 lapply(names(preds),function(i){
   xvar<-strsplit(i,"\\.")[[1]][1]
   xvar2<-strsplit(i,"\\.")[[1]][2]
   xlim<-range(preds[[i]][[1]][,xvar])
   ywide<-unlist(preds)
-  ylim<-range(as.numeric(ywide[grep("\\.mean",names(ywide))]))
+  ylim<-range(as.numeric(ywide[grep("\\.mean",names(ywide))]))*c(0.5,1.5)
   #ylim<-range(unlist(do.call("rbind",preds[[i]])[,c("low","mean","high"),drop=FALSE]))
-  plot(0.1,0.1,xlab="",ylab="",xlim=xlim,ylim=ylim,type="n",mgp=c(2,0.5,0),tcl=-0.1,log="")
+  plot(0.1,0.1,xlab="",ylab="",xlim=xlim,ylim=ylim,type="n",mgp=c(2,0.15,0),tcl=-0.1,log="")
   ### density of values where species is observed
   vals<-backScale(dmeshPred[,i],i)
-  h<-hist(vals[dmesh$spobs>0],breaks=seq(min(vals),max(vals),length.out=40),plot=FALSE)
+  brks<-seq(min(vals),max(vals),length.out=20)
+
+  h<-hist(vals,breaks=brks,plot=FALSE)
   h$density<-(h$density/max(h$density))
   h$density<-h$density/(max(h$density)/ylim[2])
   lapply(seq_along(h$density),function(j){
-    rect(xleft=h$breaks[j],ybottom=0,xright=h$breaks[j+1],ytop=h$density[j],border=NA,col=adjustcolor("seagreen",0.25))
+    rect(xleft=h$breaks[j],ybottom=0,xright=h$breaks[j+1],ytop=h$density[j],border=NA,col=adjustcolor("seagreen",0.20))
+  })
+  
+  h<-hist(vals[dmesh$spobs>0],breaks=brks,plot=FALSE)
+  h$density<-(h$density/max(h$density))
+  h$density<-h$density/(max(h$density)/ylim[2])
+  lapply(seq_along(h$density),function(j){
+    rect(xleft=h$breaks[j],ybottom=0,xright=h$breaks[j+1],ytop=h$density[j],border=NA,col=adjustcolor("orange",0.25))
   })
 
   lapply(seq_along(preds[[i]]),function(jj){
     j<-preds[[i]][[jj]]
     x<-j[,xvar]
-    polygon(c(x,rev(x),x[1]),c(j[,"low"],rev(j[,"high"]),j[,"low"][1]),col=adjustcolor("black",0.25),border=NA)
-    lines(x,j[,"mean"],lwd=1.5,col=adjustcolor("black",0.25))
-    mtext(side=1,line=2,text=xvar,font=2,cex=1.25)
+    polygon(c(x,rev(x),x[1]),c(j[,"low"],rev(j[,"high"]),j[,"low"][1]),col=adjustcolor("black",0.13),border=NA)
+    lines(x,j[,"mean"],lwd=3,col=adjustcolor("black",0.5))
+    lines(x,j[,"low"],lwd=1,lty=1,col=adjustcolor("black",0.25))
+    lines(x,j[,"high"],lwd=1,lty=1,col=adjustcolor("black",0.25))
+    mtext(side=1,line=1.5,text=xvar,font=2,cex=1.25)
+    box(col="grey70")
   })
   if(length(preds[[i]])>1){
     temp<-do.call("rbind",preds[[i]])
     var2<-strsplit(temp$vars[1],"\\.")[[1]][2]
     legend("top",title=var2,legend=round(as.numeric(unique(temp[,var2])),2),lwd=1,col=seq_along(preds[[i]]),bty="n",cex=1.25)
   }
-
-
-
 
 
   #p1<-marginals[[i]]
@@ -138,14 +147,41 @@ lapply(names(preds),function(i){
   #lines(vals,p1[,2],lwd=1.5)
   #polygon(c(vals,rev(vals),vals[1]),c(p1[,1],rev(p1[,3]),p1[,1][1]),col=alpha("black",0.1),border=NA)
 })
+posterior<-function(param,name){
+  i<-grep(param,names(mpp$marginals.hyperpar),ignore.case=TRUE)
+  xy<-mpp$marginals.hyperpar[[i]]
+  xy2<-xy[rev(1:nrow(xy)),]
+  xy2[,2]<-0
+  xy2<-rbind(xy,xy2)
+  plot(xy[,1],xy[,2],xlim=c(min(xy[,1]),xy[,1][max(which(xy[,2]>(max(xy[,2])*0.025)))+1]),type="n",xlab="",ylab="",mgp=c(2,0.25,0),tcl=-0.1)
+  polygon(xy2[,1],xy2[,2],border=NA,col=adjustcolor("black",0.10))
+  lines(xy[,1],xy[,2],lwd=1,col=adjustcolor("black",0.25))
+  abline(v=mpp$summary.hyperpar[i,][,"mean"],lwd=3,col=adjustcolor("black",0.50))
+  mtext(side=1,line=2,text=name,font=2,cex=1.25)
+  box(col="grey70")
+}
+posterior("Range","Range (km)")
+posterior("stdev","SD")
+
+par(new=TRUE,mfrow=c(1,1),mar=c(0,0,0,0),oma=c(0,0,0,0))
+plot(0,0,axes=FALSE,type="n",bty="n")
+legend("top",ncol=2,legend=c("Mean (predicted or parameter)","CI (95%) or posterior distribution","Density of values in study area","Density of values where species observed"),pch=c(NA,22,22,22),pt.cex=c(NA,2,2,2),lwd=c(3,NA,NA,NA),pt.lwd=c(3,NA,NA,1),inset=c(0,0),col=c(adjustcolor("black",0.50),adjustcolor("black",0.25),adjustcolor("seagreen",0.20),adjustcolor("orange",0.20)),pt.bg=c(NA,adjustcolor("black",0.15),adjustcolor("seagreen",0.20),adjustcolor("orange",0.20)),cex=1.25,bty="n")
+
+
+
 dev.off()
+system(paste("code",file.path(getwd(),"graphics","marginal_effects.png")), wait=FALSE)
 
 #preds1<-mapSpace(ml[[1]],dims=dim(r),sPoly=region)[["mean"]]
 
-##############
-##############
-##############
-##############
+#############################################################
+#############################################################
+#############################################################
+#############################################################
+#############################################################
+#############################################################
+#############################################################
+#############################################################
 
 ### check vif for specific model
 library(car)
@@ -162,7 +198,7 @@ varset<-grep("_esa",vs,value=TRUE)
 hist(rowSums(do.call("cbind",lapply(varset,function(i){
   backScale(dmeshPred[,i],i)
 }))))
-rowSums(lapply(dmeshPred[,grep("_esa",colnames(dmeshPred))])
+rowSums(lapply(dmeshPred[,grep("_esa",colnames(dmeshPred))]))
 
 
 
@@ -1632,7 +1668,8 @@ spc<-df$species[which(df$I>=0.75 & df$I<=0.95 & df$reach>=0.85 & df$n>=100)]
 spc
 
 lsp<-unique(df$species)#[1]
-i<-"Dendrocygna autumnalis"
+i<-"Catharus bicknelli"
+lsp<-i
 
 #for(i in lsp[1:10]){
 cl<-makeCluster(5)
@@ -1924,3 +1961,81 @@ im2<-image_append(c(hull,unc,over),stack=FALSE)
 im<-image_append(c(im1,im2),stack=TRUE)
 
 image_write(spatial,"/data/sdm_rbq/graphics/p7_im.png")
+
+##############################################################
+##############################################################
+### random draws #############################################
+##############################################################
+##############################################################
+
+sdm<-sdmf[[grep("sample",names(sdmf),invert=TRUE)]]
+sdm<-c(sdm,exp(sdmf[[grep("sample",names(sdmf))]]))
+sdm<-crop(sdm,vect(na))
+sdm<-mask(sdm,vect(na))
+#map("mean")
+
+
+samps<-paste0("sample",formatC(sample(1:100,40),width=3,flag=0))
+zlim<-range(values(sdm[[samps]]),na.rm=TRUE)
+lapply(seq_along(samps),function(i){
+  png(paste0("/data/sdm_rbq/temp/animation",i,".png"),width=9,height=8,units="in",res=200)
+  map(samps[i],range=zlim)
+  dev.off()
+})
+
+lf<-list.files("/data/sdm_rbq/temp",pattern="animation",full=TRUE)
+img<-lapply(lf,image_read)
+img<-do.call("c",img)
+img<-image_scale(img,"x400")
+
+animation <- image_animate(img, fps = 5, optimize = TRUE)
+image_write(animation,"/data/sdm_rbq/graphics/uncertainty.gif")
+
+
+
+#sdm<-mapSpace(modelSpace=m[[i]],dims=round(0.25*c(2,2)*dim(r)[1:2],0),sPoly=as(na,"Spatial"),sample=TRUE)#[[type]]
+
+png(paste0("/data/sdm_rbq/graphics/pixelation.png"),width=9,height=8,units="in",res=300)
+sdm2<-sdm[[grep("sample",names(sdm))]]
+#sdm2<-aggregate(sdm2,2,fun=function(i){sample(i,1)})
+a<-as.array(sdm2)
+pixels<-sapply(unlist(asplit(asplit(a,1:2),1),recursive=FALSE,use.names=FALSE),function(i){
+  #i<-i[i>=quantile(i,0.025,na.rm=TRUE) & i<=quantile(i,0.975,na.rm=TRUE)]
+  sample(i,size=1)
+})
+pixelation<-setValues(sdm2[[1]],pixels)
+pixelation<-resample(pixelation,sdm[[1]])
+plot(pixelation,col=colmean,mar=c(0,0,0,0))
+naplot()
+dev.off()
+
+
+#####################################
+#####################################
+#####################################
+#####################################
+
+
+transy<-function(i){sqrt(i)}#log(i+0.1)}
+y<-dmesh$spobs/dmesh$nbobs
+pred<-"conifers_esa"
+predx<-backScale(dmeshPred[,pred],pred)
+predx<-dmeshPred[,pred]
+plot(predx,transy(y))
+dat<-st_drop_geometry(dmesh)
+#dat<-cbind(dat,data.frame(dmeshPred[,pred,drop=FALSE]))
+dat[,pred]<-predx
+dat<-dat[dat$nbobs>0,]
+form1<-as.formula(paste0("spobs~s(",pred,") + offset(log(nbobs))"))
+smooth1<-gam(form1,family="poisson",data=dat)
+form2<-as.formula(paste0("spobs~",pred,"+ offset(log(nbobs))"))
+smooth2<-glm(form2,family="poisson",data=dat)
+xs<-seq(min(dat[,pred]),max(dat[,pred]),length.out=100)
+newdat<-data.frame(xs,nbobs=3.8)
+names(newdat)[1]<-pred
+p1<-predict(smooth1,newdat,type="response")
+lines(xs,transy(p1),col="red",lwd=5)
+p2<-predict(smooth2,newdat,type="response")
+lines(xs,transy(p2),col="red",lwd=5)
+
+

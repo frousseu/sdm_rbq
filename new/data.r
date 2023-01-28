@@ -14,6 +14,9 @@ library(FRutils)
 library(rmapshaper)
 #library(rnaturalearth)
 
+options(width=150)
+options(vsc.dev.args = list(width = 1000, height = 800))
+
 #########################################################################
 ### Load predictors #####################################################
 
@@ -80,7 +83,7 @@ ed[,species:=scientific_name]
 ### Load data ###################################################
 
 cols<-c("class","family","genus","species","infraspecificEpithet","countryCode","stateProvince","decimalLatitude","decimalLongitude","coordinateUncertaintyInMeters","day","month","year","recordedBy","occurrenceID")
-d<-fread("/data/predictors_sdm/inat/0425942-210914110416597.csv",encoding="UTF-8",nThread=30,select=cols) 
+d<-fread("/data/predictors_sdm/inat/0425942-210914110416597.csv",encoding="UTF-8",nThread=10,select=cols) 
 d<-d[class%in%c("Aves"),]
 d<-d[countryCode%in%c("US","CA"),]
 d<-d[!stateProvince%in%c("Hawaii"),]
@@ -103,7 +106,8 @@ changes<-list(
   c("Phalacrocorax auritus","Nannopterum auritum"),
   c("Tyto furcata","Tyto alba"),
   c("Larus smithsonianus","Larus argentatus"),
-  c("Larus brachyrhynchus","Larus canus/brachyrhynchus")
+  c("Larus brachyrhynchus","Larus canus/brachyrhynchus"),
+  c("Grus canadensis","Antigone canadensis")
 )
 changes<-as.data.table(do.call("rbind",changes))
 setnames(changes,c("old","new"))
@@ -116,6 +120,7 @@ d[,taxon:=trimws(paste(species,infraspecificEpithet))]
 tax<-unique(d,by="taxon")[,.(taxon,occurrenceID)]
 tax[,obsid:=basename(occurrenceID)]
 ltax<-split(tax$obsid, ceiling(seq_len(nrow(tax))/30))
+
 
 if(FALSE){ # not run if have been ran already
   taxanames<-lapply(seq_along(ltax),function(j){
@@ -135,8 +140,12 @@ if(FALSE){ # not run if have been ran already
   fwrite(tax,"tax.cvs",row.names=FALSE)
 }
 
+### check what happens to subspecies!!!!!! some are discarded
 tax<-fread("tax.cvs")
+#tax[,taxon:=gsub("Grus canadensis","Antigone canadensis",taxon)]
+#fwrite(tax,"tax.cvs",row.names=FALSE)
 d<-merge(d,tax[,.(taxon,inat,inat_common)])
+
 
 #spnames<-d[,.(n=.N),by=.(species,taxon,inat,inat_common)]
 #spnames[,matched:=inat%in%ed$species | species%in%ed$species | inat_common%in%ed$common_name | sub("^(\\S*\\s+\\S+).*", "\\1",inat)%in%ed$species]

@@ -12,9 +12,9 @@ Sys.setlocale("LC_ALL","English")
 #text<-paste(tex,collapse="\n")
 #text(par("usr")[1],par("usr")[3],text,adj=c(0,0))
 
-mapSpecies_panel<-"This maps shows the relative intensity predicted by the effort-adjusted Log-Gaussian Cox Process model. Intuitively, the relative intensity can be understood as a relative density surface where high densities indicate a higher number of observations. It is a measure of relative abundance."
-eBird_panel<-"This maps shows the mean number of individual birds detected in an eBird checklist for a period of an hour. It is also a measure of relative abundance. To facilitate visualization, a square root transformation has been applied to the color scale. Click on the link over the map to go to the corresponding eBird species page."
-overlap_panel<-"This histogram shows the distribution of overlap values between the mapSpecies and the eBird models. A value of 0 indicates completely different distributions and a value of 1 indicates identical distributions. The histrogram show the distributions of values for each species modeled that reached at least 85% of the stabilization hull. The vertical bar shows the overlap value for the focus species."
+mapSpecies_panel<-"This maps shows the relative intensity predicted by the mapSpecies model. Intuitively, the relative intensity can be understood as a relative density surface where high densities indicate a higher number of observations. It is a measure of relative abundance."
+eBird_panel<-"This maps shows the mean number of individual birds detected in an eBird checklist for a period of an hour. It is also a measure of relative abundance. To facilitate visualization, a square root transformation has been applied to the color scale. Follow the link over the map to go to the corresponding eBird species page."
+overlap_panel<-"This histogram shows the distribution of overlap values between the mapSpecies and the eBird models. A value of 0 indicates completely different distributions and a value of 1 indicates identical distributions. The histogram shows the distribution of values for each species modeled that reached at least 85% of the stabilization hull. The vertical bar shows the overlap value for the focus species."
 observations_panel<-"iNaturalist research-grade observations used for modeling the species distributions."
 stabilization_panel<-"Shows the stabilization of surface areas of convex hulls around observations when randomly sampling an increasing number of observations. When the curve gets close to the asymptote, it suggests that observations likely cover the range of species."
 predictors_panel<-"Shows the relative intensity predicted when the spatial component is removed from the predictions. This represents the effects when only the predictors are considered (whitin the context of the spatial model)."
@@ -271,14 +271,14 @@ h1 {
   margin: 0vh;
   padding: 0vh;
   color: seagreen;
-  <!-- border-bottom: 2px solid seagreen; -->
-  <!-- border-right: 2px solid seagreen; -->
+  /* border-bottom: 2px solid seagreen; */
+  /* border-right: 2px solid seagreen; */
 }
 
 .section{
   border-left: 0.5vmin solid seagreen;
-  <!-- border-bottom: 2px solid seagreen; -->
-  <!-- border-right: 2px solid seagreen; -->
+  /* border-bottom: 2px solid seagreen; */
+  /* border-right: 2px solid seagreen; */
 }
 
 /* .hide {
@@ -417,8 +417,8 @@ header {
   position: absolute;
   background-color: #FFFFFF00;
   top: 17%;
-  left: 7%;
-  width: 85%;
+  left: 2%;
+  width: 98%;
   text-align: left;
   /* border: 1px solid red; */
 }
@@ -442,7 +442,7 @@ header {
 
 .text2 {
   background-color: #FFFFFF00;
-  color: #00000055;
+  color: #00000033;
   opacity: 1;
   font-size: 1.75vmin;
   padding: 1vmin;
@@ -492,7 +492,7 @@ header {
 
 
 <hr class=\"vspace\"> 
-<h2 id=\"Explanations\" class=\"h2\">See below for quick explanations</h2>  
+<h2 id=\"Explanations\" class=\"h2\">See below and hover over figures for quick explanations</h2>  
 <!-- <section class=\"section\"></section> -->
 <div class=\"subheader\"></div>
 
@@ -513,7 +513,7 @@ header {
         <a class=\"aim\" target=\"_blank\" href=\"https://www.inaturalist.org/observations/142367503\">
           <div class=\"infotop\">Breeding period<br>No. of observations used</div>
           <!-- <a class=\"aim\" target=\"_blank\" href=\"https://www.inaturalist.org/observations/142367503\"> -->
-          <img style=\"height: 12vw; padding-top: 5%; padding-left: 0%; border: 0px solid green;\" src=\"images/Dendrocygna_autumnalis_pic.png\" alt=\"\">
+          <img style=\"height: 12vw; padding-top: 5%; padding-left: 0%; border: 0px solid green;\" src=\"",file.path(src,"Dendrocygna_autumnalis"),"_pic.png\" alt=\"\">
         <div class=\"middle\" style=\"border: 0px solid red;\">
           <div class=\"text\" style=\"border: 0px solid green;\">(c) Author of photo<br>Licence<br>Click to see observation<br>on iNaturalist</div>
         </div>
@@ -524,7 +524,7 @@ header {
     </div>
     <div class=\"col4\">
     <div class=\"container2\">
-      <img class=\"image2\" style=\"height: 20vw; padding: 0px;\" src=\"images/Dendrocygna_autumnalis_sdm_small.png\" alt=\"\">
+      <img class=\"image2\" style=\"height: 20vw; padding: 0px;\" src=\"",file.path(src,"Dendrocygna_autumnalis"),"_sdm_small.png\" alt=\"\">
       <div class=\"middle2\" style=\"border: 0px solid red;\">
       <div class=\"text2\" style=\"border: 0px solid green;\">",mapSpecies_panel,"</div>
       </div>
@@ -532,7 +532,7 @@ header {
     </div>
     <div class=\"col3\">
     <div class=\"container2\">
-      <img class=\"image2\" style=\"height: 20vw; padding: 0px;\" src=\"images/Dendrocygna_autumnalis_ebird_small.png\" alt=\"\">
+      <img class=\"image2\" style=\"height: 20vw; padding: 0px;\" src=\"",file.path(src,"Dendrocygna_autumnalis"),"_ebird_small.png\" alt=\"\">
       <div class=\"middle2\" style=\"border: 0px solid red;\">
       <div class=\"text2\" style=\"border: 0px solid green;\">",eBird_panel,"</div>
       </div>
@@ -540,7 +540,7 @@ header {
     </div>
     <div class=\"col4\">
     <div class=\"container2\">
-      <img class=\"image3\" style=\"height: 16vw; padding-top: 20%;\" src=\"images/Dendrocygna_autumnalis_over.png\" alt=\"\">
+      <img class=\"image3\" style=\"height: 16vw; padding-top: 20%;\" src=\"",file.path(src,"Dendrocygna_autumnalis"),"_over.png\" alt=\"\">
       <div class=\"middle2\" style=\"border: 0px solid red;\">
       <div class=\"text2\" style=\"border: 0px solid green;\">",overlap_panel,"</div>
       </div>
@@ -561,13 +561,13 @@ header {
   <div class=\"row\" id=\"Explanationspanel\" style=\"display: flex;\">
     <div class=\"col1\" id=\"Explanationspanel1\" style=\"visibility: visible; display: flex;\">
       <div class=\"container3\">
-      <img class=\"image2\" style=\"height: 13vw; padding: 0px;\" src=\"images/Dendrocygna_autumnalis_obs_small.png\" alt=\"\">
+      <img class=\"image2\" style=\"height: 13vw; padding: 0px;\" src=\"",file.path(src,"Dendrocygna_autumnalis"),"_obs_small.png\" alt=\"\">
       <div class=\"middle3\" style=\"border: 0px solid red;\">
       <div class=\"text2\" style=\"border: 0px solid green;\">",observations_panel,"</div>
       </div>
       </div>
       <div class=\"container3\">
-      <img class=\"image3\" style=\"height: 13vw; padding: 0px;\" src=\"images/Dendrocygna_autumnalis_stab.png\" alt=\"\">
+      <img class=\"image3\" style=\"height: 13vw; padding: 0px;\" src=\"",file.path(src,"Dendrocygna_autumnalis"),"_stab.png\" alt=\"\">
       <div class=\"middle3\" style=\"border: 0px solid red;\">
       <div class=\"text2\" style=\"border: 0px solid green;\">",stabilization_panel,"</div>
       </div>
@@ -575,19 +575,19 @@ header {
     </div>
     <div class=\"col2\" id=\"Explanationspanel2\" style=\"visibility: visible; display: flex;\">
       <div class=\"container3\">
-      <img class=\"image2\" style=\"height: 13vw; padding: 0px;\" src=\"images/Dendrocygna_autumnalis_pred_small.png\" alt=\"\">
+      <img class=\"image2\" style=\"height: 13vw; padding: 0px;\" src=\"",file.path(src,"Dendrocygna_autumnalis"),"_pred_small.png\" alt=\"\">
       <div class=\"middle3\" style=\"border: 0px solid red;\">
       <div class=\"text2\" style=\"border: 0px solid green;\">",predictors_panel,"</div>
       </div>
       </div>
       <div class=\"container3\">
-      <img class=\"image2\" style=\"height: 13vw; padding: 0px;\" src=\"images/Dendrocygna_autumnalis_spatial_small.png\" alt=\"\">
+      <img class=\"image2\" style=\"height: 13vw; padding: 0px;\" src=\"",file.path(src,"Dendrocygna_autumnalis"),"_spatial_small.png\" alt=\"\">
       <div class=\"middle3\" style=\"border: 0px solid red;\">
       <div class=\"text2\" style=\"border: 0px solid green;\">",spatial_panel,"</div>
       </div>
       </div>
       <div class=\"container3\">
-      <img class=\"image2\" style=\"height: 13vw; padding: 0px;\" src=\"images/Dendrocygna_autumnalis_sd_small.png\" alt=\"\">
+      <img class=\"image2\" style=\"height: 13vw; padding: 0px;\" src=\"",file.path(src,"Dendrocygna_autumnalis"),"_sd_small.png\" alt=\"\">
       <div class=\"middle3\" style=\"border: 0px solid red;\">
       <div class=\"text2\" style=\"border: 0px solid green;\">",sd_panel,"</div>
       </div>
@@ -596,7 +596,7 @@ header {
   </div>
 </section>
 
-
+<hr class=\"vspace\"> 
 
 
 

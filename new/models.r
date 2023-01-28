@@ -49,6 +49,7 @@ be<-unlist(ed[match(sp,ed$scientific_name),c("start","end")])
 
 ### all obs for period
 obs<-d[md>=be[1] & md<=be[2],]
+#obs<-d
 
 ### remove duplicate obs
 obs<-unique(obs,by=c("recordedBy","species","cell"))
@@ -162,15 +163,17 @@ dmesh$effoccs[o]<-ifelse(dmesh$effoccs[o]>0,dmesh$effoccs[o],effvalue)
 
 ### Remove variables with very low coverage
 
-if(TRUE){
+vars<-vars_pool
+
+if(FALSE){
   # remove interactions
-  x<-unlist(lapply(grep("2",vars_pool,value=TRUE,invert=TRUE),function(k){
+  x<-unlist(lapply(grep("2|3|4|5|6",vars_pool,value=TRUE,invert=TRUE),function(k){
     x<-backScale(dmeshPred[,k],k)
     h<-hist(x[dmesh$spobs>0],breaks=seq(min(x),max(x),length.out=100),  plot=FALSE)
     #h$density
     w<-range(which(h$density>0))
     #if(sum(h$density[11:length(h$density)])==0){
-    if((length(w[1]:w[2])/length(h$density))<=0.30){ # removes vars with coverage below 0.20
+    if((length(w[1]:w[2])/length(h$density))<=0.25){ # removes vars with coverage below 0.20
     #if(h$mids[w]<=0.25){ # removes vars with coverage below 0.15
       k
     }else{
@@ -179,7 +182,7 @@ if(TRUE){
     # if max positive value is inferior to 5% or 10% of values, remove this variable
   }))
   if(!is.null(x)){
-    x<-c(x,paste0(x,rep(2,length(x))))
+    x<-c(x,paste0(x,rep(2:6,each=length(x))))
     vars<-vars_pool[!vars_pool%in%x]
   }else{
     vars<-vars_pool
@@ -193,7 +196,7 @@ formula<-f
 sPoints<-st_as_sf(spobs,coords=c("x","y"),crs=crsr)
 #explanaMesh<-explana
 ppWeight<-weights
-prior.range<-c(100,0.01)
+prior.range<-c(50,0.01)
 prior.sigma<-c(1,0.01)
 smooth<-3/2
 num.threads<-4:4
@@ -393,7 +396,7 @@ rh<-rh$reach
 
 checkpoint("Mapping distribution")
 
-png(paste0("/data/sdm_rbq/plots/","birds_",gsub(" ","_",sp),".png"),units="in",width=10,height=8,res=200)
+png(paste0("/data/sdm_rbq/sdms/","birds_",gsub(" ","_",sp),".png"),units="in",width=10,height=8,res=200)
 m<-list(mpp=mpp)
 par(mfrow=n2mfrow(length(m)),mar=c(0,0,0,0))
 for(i in 1:length(m)){
@@ -487,22 +490,14 @@ write.table(df,file="/data/sdm_rbq/graphics/mapSpeciesres.csv",row.names=FALSE,s
 
 
 species
-i<-8
+i<-1
 mpp<-ml[[i]]$mpp
 sdm<-rast(paste0("/data/sdm_rbq/rasters/",gsub(" ","_",species[i]),"_birds.tif"))
 occs<-st_as_sf(ml[[i]]$spobs,coords=c("x","y"),crs=crsr)
 dmesh<-ml[[i]]$dmesh
 sdmf<-mapSpace(modelSpace=mpp,dims=round(1*c(1,1)*dims/4,0),sPoly=NULL,sample=TRUE)#[[type]]
 
-
-plot(mask(mean(exp(sdmf[[grep("sample",names(sdmf))]])),vect(na)))
-plot(mask(exp(sdmf$sample080),vect(na)))
-
-plot(mask(sdmf$spacemean,vect(na)),col=colmean)
-naplot()
-
-plot(mask(sdmf$mean,vect(na)),col=colo.scale(1:10,colmean))
-naplot()
+system(paste("code",paste0("/data/sdm_rbq/sdms/",paste0("birds_",gsub(" ","_",species[i]),".png"))), wait=FALSE)
 
 #####################################
 #####################################
@@ -514,6 +509,8 @@ naplot()
 #####################################
 #####################################
 #####################################
+
+if(FALSE){
 
 
 library(spatstat.core)
@@ -706,3 +703,4 @@ plot(st_geometry(na),border=adjustcolor("white",0.5),add=TRUE)
 plot(dmesh["predictor"],pal=magma,nbreaks=200,border=NA,reset=FALSE)
 plot(st_geometry(na),border=adjustcolor("white",0.5),add=TRUE)
 
+}

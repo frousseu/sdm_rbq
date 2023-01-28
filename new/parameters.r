@@ -12,6 +12,20 @@ library(ebirdst)
 ### This file is used to build parameters and model which includes
 ### mesh, spde, priors, occ aggregation, model.matrix, stacks, etc.
 
+### use more restricted zone
+#bb<-st_transform(st_as_sf(st_as_sfc(st_bbox(c(xmin = -90, xmax = -57.6, ymax = 58, ymin = 42), crs = st_crs(4326)))),st_crs(predictors))
+#bb<-st_intersection(bb,na)
+#region<-st_buffer(concaveman(st_as_sf(st_sample(bb,5000)),concavity=2),50)
+#plot(st_geometry(na))
+#plot(st_geometry(region),border=NA,col=adjustcolor("black",0.1),add=TRUE)
+#par(mar=c(0,0,0,0))
+#plot(st_geometry(region))
+#plot(crop(predictors[["elevation"]],ext(region)),add=TRUE)
+#plot(st_geometry(na),add=TRUE)
+#plot(st_geometry(occs),add=TRUE,cex=0.5)
+#plot(st_geometry(region),add=TRUE)
+#plot(Mesh,add=TRUE)
+
 
 checkpoint("Region and domain")
 region<-st_buffer(concaveman(st_cast(na,"MULTIPOINT"),concavity=2),50)
@@ -22,6 +36,7 @@ set.seed(1234)
 domain<-st_coordinates(st_sample(region,5000))
 domain <- inla.nonconvex.hull(domain,convex = -0.015,resolution=75)
 checkpoint("Region and domain done")
+
 
 
 pedge<-0.002
@@ -61,7 +76,7 @@ plan(sequential)
 
 #names(esp)<-"sbias"
 #predictors<-predictors[[sapply(names(predictors),function(i){all(is.na(values(predictors[i])))})]]
-r<-predictors#/10000)
+r<-crop(predictors,vect(dmesh))#/10000)
 r<-r[[!duplicated(names(r))]]
 r<-r[[substr(names(r),1,3)!="eco"]]
 #mesh<-st_convex_hull(st_buffer(st_union(st_as_sf(as.data.frame(Mesh$loc)[,1:2],coords=1:2)),50))
@@ -267,6 +282,11 @@ dmeshPred<-cbind(dmeshPred,trans)
 ### Get dmesh ids
 coords<-c("x","y")
 s<-st_as_sf(d,coords=coords,crs=st_crs(na))
+regionmesh<-region_mesh(Mesh) # modified region that uses the inner mesh boundary
+o<-st_intersects(s,region) # keep only what's in the region (add region)
+d<-d[lengths(o)==1L,] # keep only what's in the region (add region)
+s<-st_as_sf(d,coords=coords,crs=st_crs(na)) # keep only what's in the region (add region)
+
 o<-st_intersects(s,dmesh)
 o[sapply(o,function(i){length(i)==0L})] <- NA
 d[,dmesh:=unlist(o)]

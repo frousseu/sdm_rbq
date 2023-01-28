@@ -185,8 +185,19 @@ stabHull<-function(species,path="/data/sdm_rbq/stab",rh=NULL){
 
 #stabHull(species,rh=rh)
 
+region_mesh<-function(mesh){
+  x<-unique(as.vector(mesh$segm$int$idx))
+  reg<-st_polygon(list(Mesh$loc[c(x,1),]))
+  st_as_sf(st_sfc(reg),crs=st_crs(na))
+}
 
 
+
+#plot(Mesh,asp=TRUE)
+#lines(Mesh$loc[x,1],Mesh$loc[x,2],lwd=5,col="red")
+#meshregion<-st_polygon(list(Mesh$loc[c(x,1),]))
+#meshregion<-st_as_sf(st_sfc(meshregion),crs=st_crs(na))
+#plot(st_geometry(meshregion),add=TRUE,border="red",lwd=5)
 
 #############################################################
 ### Mesh to sp function #####################################
@@ -231,10 +242,10 @@ library(FRutils)
 colmean<-c("#CCCCCC","#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00","darkorange")
 colmean<-colo.scale(1:200,colmean)
 
-naplot<-function(){
-  plot(st_geometry(na),border="white",lwd=0.25,axes=FALSE,add=TRUE)
-  plot(st_geometry(nalakes),col="white",border=adjustcolor("black",0.15),lwd=0.25,axes=FALSE,add=TRUE)
-  plot(st_geometry(coast),lwd=0.25,border=gray(0,0.45),axes=FALSE,add=TRUE)
+naplot<-function(lwd=0.25){
+  plot(st_geometry(na),border="white",lwd=lwd,axes=FALSE,add=TRUE)
+  plot(st_geometry(nalakes),col="white",border=adjustcolor("black",0.15),lwd=lwd,axes=FALSE,add=TRUE)
+  plot(st_geometry(coast),lwd=lwd,border=gray(0,0.45),axes=FALSE,add=TRUE)
 }
 
 getobs<-function(sp){
@@ -429,3 +440,30 @@ coloScale<-function(
   
   
 }
+
+
+map<-function(name,obs=TRUE,cols=TRUE,...){
+  #name<-deparse(substitute(name))
+  plg<-list(cex=1.5,shrink=0.9)
+  mar<-c(0,0,0,0)
+  col<-if(cols){colmean}else{rev(terrain.colors(200))}
+  if(name%in%names(sdm)){
+    if(name=="spacemean"){
+        vals<-unlist(global(sdm[[name]],"range",na.rm=TRUE))
+        col<-colo.scale(seq(vals[1],vals[2],length.out=200),c("grey20","blue4","dodgerblue",colmean[1],"tomato2","red4","grey20"),center=TRUE)
+    }
+    plot(sdm[[name]],col=col,plg=plg,mar=mar,...)
+  }else{
+    if(name=="pred"){
+      plot(mask(mask(exp(sdm[["linkmean"]]-sdm[["spacemean"]]),region),na),col=col,plg=plg,...) 
+    }else{
+      plot(mask(mask(r[[name]],region),na),col=col,plg=plg,...) 
+    }
+  }
+  naplot(lwd=1)
+  if(obs){
+    plot(st_geometry(occs),add=TRUE)
+  }
+}
+
+#map("crop_esa")
