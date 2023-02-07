@@ -65,7 +65,7 @@ dev.off()
 
 
 checkpoint("Weights")
-plan(multicore,workers=5)
+plan(multicore,workers=10)
 weights <- ppWeight(sPoly = region, mesh = Mesh)
 dmesh <- attributes(weights)$dmesh
 dmesh$areas<-weights
@@ -130,7 +130,7 @@ gc()
 ### Extract predictors ###############################
 ### extract predictors to mesh
 checkpoint("Extracting predictors for dual mesh cells")
-plan(multicore,workers=10)
+plan(multicore,workers=5)
 cores<-nbrOfWorkers() # get nbr of workers from the chosen plan
 chunks <- split(1:nrow(dmesh), rep(1:cores, each=ceiling(nrow(dmesh)/cores))[1:nrow(dmesh)])
 options(future.globals.maxSize = 1000 * 1024 ^ 2)

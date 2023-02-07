@@ -20,7 +20,9 @@ stabilization_panel<-"Shows the stabilization of surface areas of convex hulls a
 predictors_panel<-"Shows the relative intensity predicted when the spatial component is removed from the predictions. This represents the effects when only the predictors are considered (whitin the context of the spatial model)."
 spatial_panel<-"Shows the spatial effect of the model. Red shows areas where intensities are higher than expected, conditional on the predictors in the model). Blue areas are where intensities are lower than expected. This value is added to the effect of the predictors to form the linear predictor and than exponentiated to get the predicted intensities."
 sd_panel<-"Shows the uncertainty (standard deviation) around predictions on the scale of the linear predictor."
-
+marginal_effects_panel<-"The first graphs show the effect of predictors on the relative abundance. The dark line show the predicted mean intensity and the gray area behind the curve shows the 95% credibe intervals. The last two graphs show the posetior"
+animation_panel<-""
+pixelation_panel<-""
 
 data(ebirdst_runs)
 ebird<-as.data.frame(ebirdst_runs)
@@ -119,21 +121,40 @@ species<-function(sp,url,copyright,ebirdurl,common,period,n){
 
 <section class=\"section\">
   <header>
-    <button class=\"showmore\" onclick=\"showmore('",sp,"','panel1","')\">&nbsp&nbsp&nbsp&nbspObservations and stabilization &#8628</button>
-    <button class=\"showmore\" onclick=\"showmore('",sp,"','panel2","')\">Predictors only, spatial effect and SD &#8628</button>
+    <button class=\"showmore\" onclick=\"showmorefirst('",sp,"','panel1","')\">&nbsp&nbsp&nbsp&nbspObservations and stabilization &#8628</button>
+    <button class=\"showmore\" onclick=\"showmorefirst('",sp,"','panel2","')\">Predictors only, spatial effect and SD &#8628</button>
   </header>
-  <div class=\"row\" id=\"",sp,"panel\">
+  <div class=\"row\" id=\"",sp,"panelfirst\">
     <div class=\"col1\" id=\"",sp,"panel1\">
-      <img style=\"height: 13vw; padding: 0px;\" src=\"",file.path(src,sp),"_obs_small.png\" alt=\"\">
-      <img style=\"height: 13vw; padding: 0px;\" src=\"",file.path(src,sp),"_stab.png\" alt=\"\">
+      <img style=\"height: 17vw; padding: 0px;\" src=\"",file.path(src,sp),"_obs_small.png\" alt=\"\">
+      <img style=\"height: 17vw; padding: 0px;\" src=\"",file.path(src,sp),"_stab.png\" alt=\"\">
     </div>
     <div class=\"col2\" id=\"",sp,"panel2\">
-      <img style=\"height: 13vw; padding: 0px;\" src=\"",file.path(src,sp),"_pred_small.png\" alt=\"\">
-      <img style=\"height: 13vw; padding: 0px;\" src=\"",file.path(src,sp),"_spatial_small.png\" alt=\"\">
-      <img style=\"height: 13vw; padding: 0px;\" src=\"",file.path(src,sp),"_sd_small.png\" alt=\"\">
+      <img style=\"height: 17vw; padding: 0px;\" src=\"",file.path(src,sp),"_pred_small.png\" alt=\"\">
+      <img style=\"height: 17vw; padding: 0px;\" src=\"",file.path(src,sp),"_spatial_small.png\" alt=\"\">
     </div>
   </div>
 </section>
+
+
+<section class=\"section\">
+  <header>
+    <button class=\"showmore\" onclick=\"showmoresecond('",sp,"','panel3","')\">&nbsp&nbsp&nbsp&nbspMapping uncertainty &#8628</button>
+    <button class=\"showmore\" onclick=\"showmoresecond('",sp,"','panel4","')\">Effect of predictors &#8628</button>
+  </header>
+  <div class=\"row\" id=\"",sp,"panelsecond\">
+    <div class=\"col1\" id=\"",sp,"panel3\">
+      <img style=\"height: 17vw; padding: 0px;\" src=\"images/Setophaga_americana_gif.gif\" alt=\"\">
+      <img style=\"height: 17vw; padding: 0px;\" src=\"images/Setophaga_americana_pixelation.png\" alt=\"\">
+      <img style=\"height: 17vw; padding: 0px;\" src=\"",file.path(src,sp),"_sd_small.png\" alt=\"\">
+    </div>
+    <div class=\"col2\" id=\"",sp,"panel4\">
+      <img style=\"height: 30vw; padding: 0px;\" src=\"images/Setophaga_americana_me.png\" alt=\"\">
+    </div>
+  </div>
+</section>
+
+
   
   ")
 }
@@ -317,17 +338,19 @@ header {
 .row {
   display: none;  /* aligns all child elements (flex items) in a row */
   padding-top: 1vh;
+  padding-bottom: 1vh;
 }
 
 .rowshow {
   display: flex;  /* aligns all child elements (flex items) in a row */
   padding-top: 0vh;
+  padding-bottom: 1vh;
 }
 
 .showmore {
   background: none;
   border: none; /* none */
-  padding: 0px 0px 0px 0px;
+  padding-bottom: 3vh;
   text-align: center;
   text-decoration: none;
   display: flex;
@@ -348,6 +371,7 @@ header {
   display: flex;
   flex: 1;
   visibility: hidden;
+  flex-flow: wrap;
 }
 
 .col3 .col4 {
@@ -624,10 +648,10 @@ script<-function(){cat(paste0("
     }
     
     
-    function showmore(sp,panel) {
+    function showmorefirst(sp,panel) {
       var id = sp+panel
       var x = document.getElementById(id);
-      var div = document.getElementById(sp+\"panel\");
+      var div = document.getElementById(sp+\"panelfirst\");
       var div1 = document.getElementById(sp+\"panel1\");
       var div2 = document.getElementById(sp+\"panel2\");
       var status = \"hidden\";
@@ -642,8 +666,26 @@ script<-function(){cat(paste0("
       } else {
         div.style.display = \"none\";
       }
-
-      
+    }
+    
+    function showmoresecond(sp,panel) {
+      var id = sp+panel
+      var x = document.getElementById(id);
+      var div = document.getElementById(sp+\"panelsecond\");
+      var div3 = document.getElementById(sp+\"panel3\");
+      var div4 = document.getElementById(sp+\"panel4\");
+      var status = \"hidden\";
+      if (x.style.visibility == \"visible\") {
+        x.style.visibility = \"hidden\";
+      } else {
+        x.style.visibility = \"visible\";
+        status = \"visible\";
+      }
+      if (div3.style.visibility == \"visible\" || div4.style.visibility == \"visible\" || status == \"visible\") {
+        div.style.display = \"flex\";
+      } else {
+        div.style.display = \"none\";
+      }
     }
     
 </script>

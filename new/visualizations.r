@@ -45,7 +45,27 @@ tab<-table(sapply(strsplit(row.names(samples[[1]]$latent),":"),"[",1))
 tab
 nweights<-grep("i:",row.names(samples[[1]]$latent))
 
-nd<-newdata2(as.data.frame(as.matrix(m$model.matrix)[,-1,drop=FALSE])[1:(tab[1]/2),,drop=FALSE],n=100,n2=5,fun=mean)
+fun<-function(i){ # gets median from where the species is found
+  median(i[dmesh$spobs>0]) 
+  #mean(i)
+}
+
+#ll<-lapply(names(mm),function(i){
+#  backScale(mm[dmesh$spobs>0,i],i)
+#})
+#names(ll)<-names(mm)
+#ll
+#hist(mm$tmean-dmeshPred[,"tmean"])
+#hist(mm$tmean)
+#hist(dmeshPred[,"tmean"])
+#hist(backScale(dmeshPred[,"tmean"],"tmean"))
+#hist(backScale(mm[,"tmean"],"tmean"))
+#names(m$.args$data)
+#table(m$.args$data$y==dmesh$spobs)
+
+mm<-as.data.frame(as.matrix(m$model.matrix)[,-1,drop=FALSE])[1:(tab[1]/2),,drop=FALSE] # what's in the model.matrix is related to Predictor, not APredictor
+mm<-as.data.frame(dmeshPred[,names(mm)]) # I think better to use this
+nd<-newdata2(mm,n=100,n2=5,fun=fun)
 v<-names(nd)
 nd<-unlist(nd,recursive=FALSE)
 
@@ -95,8 +115,9 @@ preds<-lapply(preds,function(i){
 })
 
 
-png(file.path(getwd(),"graphics","marginal_effects.png"),width=10,height=8,units="in",res=300)
-par(mfrow=n2mfrow(length(preds)+2,asp=2),mar=c(2.5,1.25,0.5,0.5),oma=c(1,1,5,1))
+mfrow<-n2mfrow(length(preds)+2,asp=1.5)
+png(file.path(getwd(),"graphics","marginal_effects.png"),width=3.5*mfrow[2],height=3.5*mfrow[1],units="in",res=300)
+par(mfrow=mfrow,mar=c(2.5,1.25,0.5,0.5),oma=c(1,2,5,1))
 lapply(names(preds),function(i){
   xvar<-strsplit(i,"\\.")[[1]][1]
   xvar2<-strsplit(i,"\\.")[[1]][2]
@@ -104,7 +125,14 @@ lapply(names(preds),function(i){
   ywide<-unlist(preds)
   ylim<-range(as.numeric(ywide[grep("\\.mean",names(ywide))]))*c(0.5,1.5)
   #ylim<-range(unlist(do.call("rbind",preds[[i]])[,c("low","mean","high"),drop=FALSE]))
-  plot(0.1,0.1,xlab="",ylab="",xlim=xlim,ylim=ylim,type="n",mgp=c(2,0.15,0),tcl=-0.1,log="")
+  xaxt<-if(i=="logdistance"){"n"}else{"s"}
+  yaxt<-ifelse(match(i,names(preds))%in%seq(1,mfrow[1]*mfrow[2],by=mfrow[2]),"s","n")
+  plot(0.1,0.1,xlab="",ylab="",xlim=xlim,ylim=ylim,type="n",mgp=c(2,0.15,0),tcl=-0.1,log="",xaxt=xaxt,yaxt=yaxt)
+  box(col="white",lwd=2)
+  grid(lty=3,col=adjustcolor("black",0.2))
+  if(i=="logdistance"){
+    axis(1,at=pretty(xlim,20),labels=round(10^pretty(xlim,20)-1,1),mgp=c(2,0.15,0),tcl=-0.1,cex.axis=0.5)
+  }
   ### density of values where species is observed
   vals<-backScale(dmeshPred[,i],i)
   brks<-seq(min(vals),max(vals),length.out=20)
@@ -113,14 +141,14 @@ lapply(names(preds),function(i){
   h$density<-(h$density/max(h$density))
   h$density<-h$density/(max(h$density)/ylim[2])
   lapply(seq_along(h$density),function(j){
-    rect(xleft=h$breaks[j],ybottom=0,xright=h$breaks[j+1],ytop=h$density[j],border=NA,col=adjustcolor("seagreen",0.20))
+    rect(xleft=h$breaks[j],ybottom=0,xright=h$breaks[j+1],ytop=h$density[j],border=NA,col=adjustcolor("seagreen",0.25))
   })
   
   h<-hist(vals[dmesh$spobs>0],breaks=brks,plot=FALSE)
   h$density<-(h$density/max(h$density))
   h$density<-h$density/(max(h$density)/ylim[2])
   lapply(seq_along(h$density),function(j){
-    rect(xleft=h$breaks[j],ybottom=0,xright=h$breaks[j+1],ytop=h$density[j],border=NA,col=adjustcolor("orange",0.25))
+    rect(xleft=h$breaks[j],ybottom=0,xright=h$breaks[j+1],ytop=h$density[j],border=NA,col=adjustcolor("orange",0.30))
   })
 
   lapply(seq_along(preds[[i]]),function(jj){
@@ -131,7 +159,7 @@ lapply(names(preds),function(i){
     lines(x,j[,"low"],lwd=1,lty=1,col=adjustcolor("black",0.25))
     lines(x,j[,"high"],lwd=1,lty=1,col=adjustcolor("black",0.25))
     mtext(side=1,line=1.5,text=xvar,font=2,cex=1.25)
-    box(col="grey70")
+    #box(col="grey70")
   })
   if(length(preds[[i]])>1){
     temp<-do.call("rbind",preds[[i]])
@@ -154,18 +182,20 @@ posterior<-function(param,name){
   xy2[,2]<-0
   xy2<-rbind(xy,xy2)
   plot(xy[,1],xy[,2],xlim=c(min(xy[,1]),xy[,1][max(which(xy[,2]>(max(xy[,2])*0.025)))+1]),type="n",xlab="",ylab="",mgp=c(2,0.25,0),tcl=-0.1)
+  box(col="white",lwd=2)
+  grid(lty=3,col=adjustcolor("black",0.2))
   polygon(xy2[,1],xy2[,2],border=NA,col=adjustcolor("black",0.10))
   lines(xy[,1],xy[,2],lwd=1,col=adjustcolor("black",0.25))
   abline(v=mpp$summary.hyperpar[i,][,"mean"],lwd=3,col=adjustcolor("black",0.50))
   mtext(side=1,line=2,text=name,font=2,cex=1.25)
-  box(col="grey70")
+  #box(col="grey70")
 }
 posterior("Range","Range (km)")
 posterior("stdev","SD")
 
 par(new=TRUE,mfrow=c(1,1),mar=c(0,0,0,0),oma=c(0,0,0,0))
 plot(0,0,axes=FALSE,type="n",bty="n")
-legend("top",ncol=2,legend=c("Mean (predicted or parameter)","CI (95%) or posterior distribution","Density of values in study area","Density of values where species observed"),pch=c(NA,22,22,22),pt.cex=c(NA,2,2,2),lwd=c(3,NA,NA,NA),pt.lwd=c(3,NA,NA,1),inset=c(0,0),col=c(adjustcolor("black",0.50),adjustcolor("black",0.25),adjustcolor("seagreen",0.20),adjustcolor("orange",0.20)),pt.bg=c(NA,adjustcolor("black",0.15),adjustcolor("seagreen",0.20),adjustcolor("orange",0.20)),cex=1.25,bty="n")
+legend("top",ncol=2,legend=c("Mean (predicted or parameter)","CI (95%) or posterior distribution","Density of values in study area","Density of values where species observed"),pch=c(NA,22,22,22),pt.cex=c(NA,2,2,2),lwd=c(3,NA,NA,NA),pt.lwd=c(3,NA,NA,1),inset=c(0,0),col=c(adjustcolor("black",0.50),adjustcolor("black",0.25),adjustcolor("seagreen",0.25),adjustcolor("orange",0.25)),pt.bg=c(NA,adjustcolor("black",0.15),adjustcolor("seagreen",0.25),adjustcolor("orange",0.25)),cex=1.25,bty="n")
 
 
 
@@ -1975,10 +2005,10 @@ sdm<-mask(sdm,vect(na))
 #map("mean")
 
 
-samps<-paste0("sample",formatC(sample(1:100,40),width=3,flag=0))
+samps<-paste0("sample",formatC(sample(1:100,20),width=3,flag=0))
 zlim<-range(values(sdm[[samps]]),na.rm=TRUE)
 lapply(seq_along(samps),function(i){
-  png(paste0("/data/sdm_rbq/temp/animation",i,".png"),width=9,height=8,units="in",res=200)
+  png(paste0("/data/sdm_rbq/temp/animation",i,".png"),width=9,height=8,units="in",res=300)
   map(samps[i],range=zlim)
   dev.off()
 })
@@ -1986,7 +2016,7 @@ lapply(seq_along(samps),function(i){
 lf<-list.files("/data/sdm_rbq/temp",pattern="animation",full=TRUE)
 img<-lapply(lf,image_read)
 img<-do.call("c",img)
-img<-image_scale(img,"x400")
+img<-image_scale(img,"x450")
 
 animation <- image_animate(img, fps = 5, optimize = TRUE)
 image_write(animation,"/data/sdm_rbq/graphics/uncertainty.gif")

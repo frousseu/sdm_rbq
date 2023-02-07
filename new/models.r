@@ -1,4 +1,6 @@
  
+source("/data/sdm_rbq/functions.r")
+
 if(FALSE){
   source("/data/sdm_rbq/functions.r")
   source("/data/sdm_rbq/data.r")
@@ -13,6 +15,7 @@ library(future)
 library(future.apply)
 library(future.callr)
 library(viridisLite)
+library(magick)
 
 
 ### This runs models for each species and produces necessary model outputs
@@ -38,6 +41,7 @@ dims<-dim(r)[1:2]
 #plan(sequential)
 plan(multisession,workers=min(c(3,length(species))))
 cores<-nbrOfWorkers() # get nbr of workers from the chosen plan
+#plan(sequential)
 options(future.globals.maxSize = 5000 * 1024 ^ 2)
 
 
@@ -48,7 +52,14 @@ sp<-species[j]
 be<-unlist(ed[match(sp,ed$scientific_name),c("start","end")])
 
 ### all obs for period
-obs<-d[md>=be[1] & md<=be[2],]
+if(be[1]<be[2]){
+  obs<-d[md>=be[1] & md<=be[2],]
+}else{
+  # Tyrannus savanna breeds from nov to jan
+  dr<-substr(seq.Date(as.Date(paste0("2007-",be[1])),as.Date(paste0("2008-",be[2])),by=1),6,10)
+  obs<-d[md%in%dr,]
+}
+
 #obs<-d
 
 ### remove duplicate obs
@@ -80,6 +91,17 @@ obs<-unique(obs,by=c("recordedBy","species","cell"))
 #o<-st_intersects(s,dmesh)
 #o[sapply(o,function(i){length(i)==0L})] <- NA
 #obs[,dmesh:=unlist(o)]
+
+### add obs in a predictor
+#varia<-"builtup_esa"
+#wm<-which.max(dmeshPred[,varia])
+#add<-obs[1:2,]
+#xy<-st_coordinates(st_centroid(dmesh[wm,]))
+#add[,x:=xy[1,1]]
+#add[,y:=xy[1,2]]
+#add[,dmesh:=wm]
+#add[,species:=sp]
+#obs<-rbind(obs,add)
 
 
 ### species obs
@@ -165,7 +187,7 @@ dmesh$effoccs[o]<-ifelse(dmesh$effoccs[o]>0,dmesh$effoccs[o],effvalue)
 
 vars<-vars_pool
 
-if(FALSE){
+if(TRUE){
   # remove interactions
   x<-unlist(lapply(grep("2|3|4|5|6",vars_pool,value=TRUE,invert=TRUE),function(k){
     x<-backScale(dmeshPred[,k],k)
@@ -173,11 +195,19 @@ if(FALSE){
     #h$density
     w<-range(which(h$density>0))
     #if(sum(h$density[11:length(h$density)])==0){
-    if((length(w[1]:w[2])/length(h$density))<=0.25){ # removes vars with coverage below 0.20
-    #if(h$mids[w]<=0.25){ # removes vars with coverage below 0.15
-      k
+    if(k=="elevation"){
+      if(median(x[dmesh$spobs>0])>=1000){
+        NULL
+      }else{
+        k
+      }  
     }else{
-      NULL
+      if((length(w[1]:w[2])/length(h$density))<=0.20){ # removes vars with coverage below 0.20
+      #if(h$mids[w]<=0.25){ # removes vars with coverage below 0.15
+        k
+      }else{
+        NULL
+      }
     }
     # if max positive value is inferior to 5% or 10% of values, remove this variable
   }))
@@ -348,7 +378,7 @@ model <- inla(formule,
               control.vb=list(enable=TRUE, verbose=TRUE)),
               inla.mode="experimental",
               control.fixed=bpriors,
-              control.compute=list(config=TRUE,openmp.strategy="pardiso.parallel"),
+              control.compute=list(config=TRUE,openmp.strategy="pardiso"),
               verbose=TRUE
              )
 
@@ -367,9 +397,13 @@ attributes(model) <- list(formula = formula,
                             Stack = Stack)
 
 names(model) <- nameRes
+
+checkpoint("Plotting marginal effects")
+plot_marginal_effects(m=model,sp=sp,dmesh=dmesh)
+
 class(model) <- "ppSpace"
 
-mpp<-model
+#mpp<-model
 
 ##################################################################
 ### Ouputs dependent on models ###################################
@@ -386,18 +420,31 @@ colo<-list(
 
 colmean<-c("snow2",unname(palette.colors()[7]),"darkred","darkred","grey10")
 
-colmean<-c("#EEEFF0","#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00","darkorange") #https://observablehq.com/@d3/radial-stacked-bar-chart
+colmean<-colo.scale(1:200,c("#EEEFF0","#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00","darkorange")) #https://observablehq.com/@d3/radial-stacked-bar-chart
+
 
 checkpoint("Chull reach asymptote?")
-
 rh<-rangeHull(sPoints,species=sp,breaks=200)
 stabHull(sp,rh=rh)
 rh<-rh$reach
 
-checkpoint("Mapping distribution")
 
+checkpoint("Mapping space for pixelate and animate")
+sdm<-mapSpace(modelSpace=model,dims=round(1*c(1,1)*dims/4,0),sPoly=NULL,sample=TRUE)#[[type]]
+sdm<-exp(sdm[[grep("sample",names(sdm))]])
+sdm<-crop(sdm,vect(na))
+sdm<-mask(sdm,vect(na))
+
+plot(1,1);coloScale(vals=1:200)
+checkpoint("Pixelate")
+pixelate(sdm=sdm,sp=sp)
+checkpoint("Animate")
+animate(sdm=sdm,sp=sp)
+
+
+checkpoint("Mapping distribution")
 png(paste0("/data/sdm_rbq/sdms/","birds_",gsub(" ","_",sp),".png"),units="in",width=10,height=8,res=200)
-m<-list(mpp=mpp)
+m<-list(mpp=model)
 par(mfrow=n2mfrow(length(m)),mar=c(0,0,0,0))
 for(i in 1:length(m)){
   type<-"mean"
@@ -409,7 +456,7 @@ for(i in 1:length(m)){
   #sdm <- mask(sdm,vect(nalakes),inverse=TRUE) #spacePoly
   #names(sdm)<-paste(sp,names(m)[i])
   plot(st_geometry(na),border=NA,col="white")
-  plot(sdm[[type]],add=FALSE, col = cols, axes = FALSE, box = FALSE, main = "")
+  plot(sdm[[type]],add=FALSE, col = cols, axes = FALSE, main = "")
   #plot(st_geometry(em[em$species==species[j],]),col=gray(0,0.2),border=NA,add=TRUE)
   plot(st_geometry(na),add=TRUE,lwd=0.75,border=gray(1,0.99))
   plot(st_geometry(nalakes),col="white",border=adjustcolor("black",0.15),lwd=0.5,add=TRUE)
@@ -436,7 +483,7 @@ writeRaster(sdm, filename=paste0("/data/sdm_rbq/rasters/",gsub(" ","_",sp),"_bir
  
 time<-Sys.time()
 attr(time,"tzone")<-"Indian/Reunion"
-res<-list(species=sp,mpp=mpp,spobs=spobs,dmesh=dmesh,n=nrow(spobs),reach=round(rh,5),date=time,predictors=paste(vars,collapse="+"),range=mpp$summary.hyperpar[1,1],sd=mpp$summary.hyperpar[2,1])
+res<-list(species=sp,mpp=model,spobs=spobs,dmesh=dmesh,n=nrow(spobs),reach=round(rh,5),date=time,predictors=paste(vars,collapse="+"),range=model$summary.hyperpar[1,1],sd=model$summary.hyperpar[2,1])
 
 ### write results
 results<-data.frame(
@@ -457,7 +504,7 @@ write.table(results,file="/data/sdm_rbq/graphics/mapSpeciesres.csv",row.names=FA
 print(j) 
 res
 
-}, future.packages = "data.table")
+}, future.packages = "data.table", future.seed=TRUE)
 plan(sequential)
 
 
@@ -491,6 +538,7 @@ write.table(df,file="/data/sdm_rbq/graphics/mapSpeciesres.csv",row.names=FALSE,s
 
 species
 i<-1
+sp<-species[i]
 mpp<-ml[[i]]$mpp
 sdm<-rast(paste0("/data/sdm_rbq/rasters/",gsub(" ","_",species[i]),"_birds.tif"))
 occs<-st_as_sf(ml[[i]]$spobs,coords=c("x","y"),crs=crsr)

@@ -5,7 +5,8 @@ library(mapSpecies)
 ### 
 species<-c("Setophaga pinus","Setophaga americana","Setophaga petechia","Setophaga citrina","Setophaga ruticilla","Setophaga virens")
 species<-c("Dolichonyx oryzivorus")
-species<-c("Myiarchus crinitus")
+species<-c("Leucosticte australis","Toxostoma bendirei","Haematopus palliatus","Setophaga americana")#[4]
+species<-c("Tyrannus savana")
 tab<-table(d$species)
 tab<-names(tab)[tab>30]
 tab<-tab[d$ebird[match(tab,d$ebird)]%in%ed$scientific_name]
@@ -13,7 +14,7 @@ set.seed(sample(1:10000,9))
 df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
 dontsp<-df$species[!is.na(df$I)]
 tab<-tab[!tab%in%dontsp]
-species<-sample(tab,8)
+species<-sample(tab,3)
 #species<-df$species[1:17]
 (lspecies<-species)
 d[species%in%lspecies,][,.(n=.N),by=.(species)]
@@ -30,6 +31,16 @@ d[species%in%lspecies,][,.(n=.N),by=.(species)]
 #plot(st_geometry(na))
 #plot(st_geometry(loccs[[1]]),add=TRUE)
 
+# https://becarioprecario.bitbucket.io/inla-gitbook/ch-priors.html
+HN.prior = "expression:
+  tau0 = 0.001;
+  sigma = exp(-theta/2);
+  log_dens = log(2) - 0.5 * log(2 * pi) + 0.5 * log(tau0);
+  log_dens = log_dens - 0.5 * tau0 * sigma^2;
+  log_dens = log_dens - log(2) - theta / 2;
+  return(log_dens);  
+"
+list(prec = list(prior = HN.prior))
 
 bpriors<-list(prec=list(default=1/(0.5)^2,Intercept=1/(20)^2,sbias=1/(20)^2,fixed=1/(20)^2),mean=list(default=0,Intercept=0,sbias=0,fixed=0))
 
