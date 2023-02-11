@@ -100,7 +100,7 @@ if(FALSE){
 
 ### Produce tifs with same res
 # manually delete _ebird2.tif if any and recreate them
-sdm<-rast("/data/sdm_rbq/rasters/Setophaga_pinus_birds.tif")
+sdm<-rast("/data/sdm_rbq/rasters/Setophaga_citrina_birds.tif")
 ebirds<-list.files(writepath,pattern="_ebird.tif",full=TRUE)
 wkt<-st_crs(sdm)$wkt
 te<-as.numeric(ext(sdm)[c(1,3,2,4)])

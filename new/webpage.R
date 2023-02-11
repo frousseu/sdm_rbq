@@ -6,6 +6,16 @@ library(ebirdst)
 
 Sys.setlocale("LC_ALL","English")
 
+if(FALSE){
+  
+  system("powershell -command \"scp -p rouf1703@pose.vhost33:/data/sdm_rbq/figures C:/Users/God/Downloads/images\"",intern=TRUE)
+  system("powershell -command \"scp -p rouf1703@pose.vhost33:'/data/sdm_rbq/marginaleffects' C:/Users/God/Downloads/images\"",intern=TRUE)
+  system("powershell -command \"scp -p rouf1703@pose.vhost33:'/data/sdm_rbq/temp/*_{sd_small,ebird_small,sdm_small,spatial_small,obs_small}.png' C:/Users/God/Downloads/images\"",intern=TRUE)
+  
+}
+
+
+
 
 #plot(1,1)
 #tex<-strwrap("This maps show the relative intensity predicted by the model. Intuitively, the relative intensity can be understood as a relative density. It is a measure of relative abundance.")
@@ -127,7 +137,7 @@ species<-function(sp,url,copyright,ebirdurl,common,period,n){
   <div class=\"row\" id=\"",sp,"panelfirst\">
     <div class=\"col1\" id=\"",sp,"panel1\">
       <img style=\"height: 17vw; padding: 0px;\" src=\"",file.path(src,sp),"_obs_small.png\" alt=\"\">
-      <img style=\"height: 17vw; padding: 0px;\" src=\"",file.path(src,sp),"_stab.png\" alt=\"\">
+      <img style=\"height: 17vw; padding: 0px;\" src=\"",file.path(src,sp),"_stab_small.png\" alt=\"\">
     </div>
     <div class=\"col2\" id=\"",sp,"panel2\">
       <img style=\"height: 17vw; padding: 0px;\" src=\"",file.path(src,sp),"_pred_small.png\" alt=\"\">
@@ -144,12 +154,13 @@ species<-function(sp,url,copyright,ebirdurl,common,period,n){
   </header>
   <div class=\"row\" id=\"",sp,"panelsecond\">
     <div class=\"col1\" id=\"",sp,"panel3\">
-      <img style=\"height: 17vw; padding: 0px;\" src=\"images/Setophaga_americana_gif.gif\" alt=\"\">
-      <img style=\"height: 17vw; padding: 0px;\" src=\"images/Setophaga_americana_pixelation.png\" alt=\"\">
       <img style=\"height: 17vw; padding: 0px;\" src=\"",file.path(src,sp),"_sd_small.png\" alt=\"\">
+      <img style=\"height: 17vw; padding: 0px; opacity: 0;\" src=\"",file.path(src,sp),"_sd_small.png\" alt=\"\">
+      <img style=\"height: 17vw; padding: 0px;\" src=\"",file.path(src,sp),"_pixelation_small.png\" alt=\"\">
+      <img style=\"height: 17vw; padding: 0px;\" src=\"",file.path(src,sp),"_gif.gif\" alt=\"\">
     </div>
     <div class=\"col2\" id=\"",sp,"panel4\">
-      <img style=\"height: 30vw; padding: 0px;\" src=\"images/Setophaga_americana_me.png\" alt=\"\">
+      <img style=\"height: 30vw; padding: 0px;\" src=\"",file.path(src,sp),"_me_small.png\" alt=\"\">
     </div>
   </div>
 </section>
@@ -378,7 +389,15 @@ header {
   display: flex;
   flex: 1;
   visibility: show;
+  transition: transform .2s;
 }
+
+/* .col4:hover {
+  -ms-transform: scale(1.1); /* IE 9 */
+  -webkit-transform: scale(1.1); /* Safari 3-8 */
+  transform: scale(1.1); 
+} */
+
 
 
 .ID {

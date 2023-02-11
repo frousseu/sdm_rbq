@@ -153,11 +153,30 @@ checkpoint("Done")
 ###############################################
 ### Add distance to coast
 
-sea<-st_as_sfc(st_bbox(r))
-sea<-st_difference(sea,st_union(na))
+##can<-raster:::getData('GADM', country='CAN', level=1)
+##usa<-raster:::getData('GADM', country='USA', level=1)
+##mex<-raster:::getData('GADM', country='MEX', level=1)
+#can<-gadm("CAN", level=1, path="/data/predictors_sdm")
+#usa<-gadm("USA", level=1, path="/data/predictors_sdm")
+#mex<-gadm("MEX", level=1, path="/data/predictors_sdm")
+can<-st_as_sf(vect(readRDS("/data/predictors_sdm/gadm41_CAN_1_pk.rds")))
+usa<-st_as_sf(vect(readRDS("/data/predictors_sdm/gadm41_USA_1_pk.rds")))
+mex<-st_as_sf(vect(readRDS("/data/predictors_sdm/gadm41_MEX_1_pk.rds")))
+namex<-rbind(can,usa,mex)
+namex<-st_as_sf(namex)
+namex<-st_transform(namex,prj)
+namex<-ms_simplify(namex,keep=0.005)
+
+#bboxr<-st_as_sfc(st_bbox(r))
+sea<-st_buffer(st_union(namex),dist=1500)
+sea<-st_difference(sea,st_union(namex))
 dis<-st_distance(sea,st_centroid(dmesh))
 distance<-as.numeric(dis[1,])
 logdistance<-log(distance+1,base=10)
+
+#plot(st_geometry(sea),col="cyan",border=NA)
+#plot(st_geometry(namex),add=TRUE)
+#plot(st_geometry(dmesh),add=TRUE)
 
 #distance<-(distance-mean(distance))/sd(distance)
 #adds<-matrix(mean(distance),ncol=1)

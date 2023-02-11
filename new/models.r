@@ -5,7 +5,7 @@ if(FALSE){
   source("/data/sdm_rbq/functions.r")
   source("/data/sdm_rbq/data.r")
   source("/data/sdm_rbq/parameters.r")
-  source("/data/sdm_rbq/inputs.r")
+  source("/data/sdm_rbq/inputs.r",echo=TRUE)
 }
 
 library(terra)
@@ -196,7 +196,7 @@ if(TRUE){
     w<-range(which(h$density>0))
     #if(sum(h$density[11:length(h$density)])==0){
     if(k=="elevation"){
-      if(median(x[dmesh$spobs>0])>=1000){
+      if(quantile(x[dmesh$spobs>0],0.75)>=1000){
         NULL
       }else{
         k
@@ -509,7 +509,8 @@ plan(sequential)
 
 
 ### clear old results
-df<-read.table("/data/sdm_rbq/graphics/mapSpeciesres.csv",sep=",",header=TRUE)
+res<-rev(sort(list.files("/data/sdm_rbq/graphics",pattern="mapSpeciesres",full=TRUE)))[1]
+df<-read.table(res,sep=",",header=TRUE)
 df<-df[rev(order(df$date)),][!duplicated(df$species),]
 #tz<-as.POSIXct(df$date)
 #attr(tz,"tzone")<-"Indian/Reunion"

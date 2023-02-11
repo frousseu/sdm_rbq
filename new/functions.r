@@ -175,7 +175,9 @@ stabHull<-function(species,path="/data/sdm_rbq/stab",rh=NULL){
   abline(h=rh$a,lty=3,lwd=8,col="black")
   vs<-0:max(rh$n)
   lines(vs,predict(rh$model,data.frame(X=vs)),lwd=8,col="black")
-  box(col="snow2",lwd=5)
+  #box(col="snow2",lwd=5)
+  box(col="white",lwd=2)
+  grid(lty=3,col=adjustcolor("black",0.2))
   mtext(side=1,line=2.5,cex=2.5,font=2,text="Number of locations sampled")
   mtext(side=2,line=2,cex=2.5,font=2,text=bquote(bold("Convex Hull Area "%*%~10^.(expo)~km^2)))
   mtext(side=1,line=-5,adj=0.8,cex=4.5,font=2,text=round(rh$reach,2),col="grey20")
@@ -491,6 +493,20 @@ map<-function(name, obs=TRUE, cols=TRUE, trans=NULL, ...){
 
 plot_marginal_effects<-function(m,sp,dmesh,nsims=100,open=FALSE){
 
+vnames<-list(
+  tmean="Mean annual temperature (\u00B0C)",
+  deciduous_esa="% of deciduous forests",
+  builtup_esa="% of builtup areas",
+  crop_esa="% of crop",
+  grass_esa="% of grass",
+  mixed_esa="% of mixed forests",
+  shrubs_esa="% of shrubs",
+  conifers_esa="% of coniferous forests",
+  logdistance="Distance to coast (km)",
+  elevation="Elevation (m)",
+  water="% of water"
+)
+
 #m<-mpp
 class(m)<-"inla"
 samples<-inla.posterior.sample(nsims,m,num.threads="2:2")
@@ -584,8 +600,13 @@ lapply(names(preds),function(i){
   plot(0.1,0.1,xlab="",ylab="",xlim=xlim,ylim=ylim,type="n",mgp=c(2,0.15,0),tcl=-0.1,log="",xaxt=xaxt,yaxt=yaxt)
   box(col="white",lwd=2)
   grid(lty=3,col=adjustcolor("black",0.2))
+
   if(i=="logdistance"){
-    axis(1,at=pretty(xlim,20),labels=round(10^pretty(xlim,20)-1,1),mgp=c(2,0.15,0),tcl=-0.1,cex.axis=0.5)
+    c(1,2.3,9.1,11)/10
+    at<-pretty(xlim,5)
+    labs<-ifelse((10^at-1)/10<1,round((10^at-1),1),round((10^at-1),0))
+    #axis(1,at=pretty(xlim,20),labels=round(10^pretty(xlim,20)-1,1),mgp=c(2,0.15,0),tcl=-0.1,cex.axis=0.5)
+    axis(1,at=at,labels=labs,mgp=c(2,0.15,0),tcl=-0.1,cex.axis=1,lwd=0)
   }
   ### density of values where species is observed
   vals<-backScale(dmeshPred[,i],i)
@@ -612,7 +633,13 @@ lapply(names(preds),function(i){
     lines(x,j[,"mean"],lwd=3,col=adjustcolor("black",0.5))
     lines(x,j[,"low"],lwd=1,lty=1,col=adjustcolor("black",0.25))
     lines(x,j[,"high"],lwd=1,lty=1,col=adjustcolor("black",0.25))
-    mtext(side=1,line=1.5,text=xvar,font=2,cex=1.25)
+    m<-match(xvar,names(vnames))
+    if(!is.na(m)){
+      xvarname<-vnames[[m]]
+    }else{
+      xvarname<-xvar
+    }
+    mtext(side=1,line=1.5,text=xvarname,font=2,cex=1.25)
     #box(col="grey70")
   })
   if(length(preds[[i]])>1){

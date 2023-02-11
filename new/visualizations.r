@@ -1693,13 +1693,14 @@ image_write(maps,file.path("/data/sdm_rbq/graphics","bird_maps.png"))
 #  plot(st_geometry(coast),lwd=0.25,border=gray(0,0.45),add=TRUE)
 #}
 
+
 df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
 spc<-df$species[which(df$I>=0.75 & df$I<=0.95 & df$reach>=0.85 & df$n>=100)]
 spc
 
 lsp<-unique(df$species)#[1]
-i<-"Catharus bicknelli"
-lsp<-i
+#i<-"Catharus bicknelli"
+#lsp<-i
 
 #for(i in lsp[1:10]){
 cl<-makeCluster(5)
@@ -1821,9 +1822,12 @@ registerDoParallel(cl)
 "/data/sdm_rbq/temp"
 lsp<-list.files("/data/sdm_rbq/temp",full=TRUE)
 lsp<-lsp[-grep("_small.",lsp)]
-lsp<-lsp[grep("Dendrocygna",lsp)]
+#lsp<-lsp[grep("Spizella_pallida",lsp)]
 foreach(i=lsp,.packages=c("magick")) %dopar% {
-  image_write(image_scale(image_read(i),"500"),gsub(".png","_small.png",i))
+  image_read(i) |>
+  image_scale("500") |>
+  image_quantize(max=100,dither=TRUE) |>
+  image_write(gsub(".png","_small.png",i))
 }
 stopCluster(cl)
   #ebird2<-aggregate(ebird,9)
@@ -2069,3 +2073,58 @@ p2<-predict(smooth2,newdat,type="response")
 lines(xs,transy(p2),col="red",lwd=5)
 
 
+###############################################################
+###  shrink and or quantize images ############################
+###############################################################
+
+### marginal effects
+cl<-makeCluster(25)
+registerDoParallel(cl)
+lsp<-list.files("/data/sdm_rbq/marginaleffects",full=TRUE)
+lsp<-lsp[-grep("_small.",lsp)]
+#lsp<-lsp[grep("Dendrocygna",lsp)]
+foreach(i=lsp,.packages=c("magick")) %dopar% {
+  image_read(i) |>
+  image_quantize(max=50,dither=TRUE) |>
+  image_write(gsub(".png","_small.png",i))
+}
+stopCluster(cl)
+
+### pixelation and gif
+cl<-makeCluster(25)
+registerDoParallel(cl)
+lsp<-list.files("/data/sdm_rbq/figures",full=TRUE,pattern=".png")
+lsp<-lsp[-grep("_small.",lsp)]
+#lsp<-lsp[grep("Dendrocygna",lsp)]
+foreach(i=lsp,.packages=c("magick")) %dopar% {
+  image_read(i) |>
+  image_quantize(max=100,dither=TRUE) |>
+  image_write(gsub(".png","_small.png",i))
+}
+stopCluster(cl)
+
+### stab
+cl<-makeCluster(25)
+registerDoParallel(cl)
+lsp<-list.files("/data/sdm_rbq/stab",full=TRUE,pattern=".png")
+lsp<-lsp[-grep("_small.",lsp)]
+foreach(i=lsp,.packages=c("magick")) %dopar% {
+  image_read(i) |>
+  image_scale("500") |>
+  image_quantize(max=50,dither=TRUE) |>
+  image_write(gsub(".png","_small.png",i))
+}
+stopCluster(cl)
+
+### over
+cl<-makeCluster(25)
+registerDoParallel(cl)
+lsp<-list.files("/data/sdm_rbq/overlap",full=TRUE,pattern=".png")
+lsp<-lsp[-grep("_small.",lsp)]
+foreach(i=lsp,.packages=c("magick")) %dopar% {
+  image_read(i) |>
+  image_scale("500") |>
+  image_quantize(max=50,dither=TRUE) |>
+  image_write(gsub(".png","_small.png",i))
+}
+stopCluster(cl)
