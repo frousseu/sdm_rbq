@@ -71,6 +71,7 @@ ed[,breeding_end:=ifelse(is.na(breeding_end),"2020-12-31",breeding_end)]
 ed[,start:=substr(breeding_start,6,10)]
 ed[,end:=substr(breeding_end,6,10)]
 ed[,species:=scientific_name]
+ed$species[ed$species=="Larus canus/brachyrhynchus"]<-"Larus brachyrhynchus"
 #ed[,gbif:=ifelse(!is.na(match(species,unique(d$species))),species,NA)]
 
 #k<-which(log(d$coordinateUn)>=10 & log(d$coordinateUn)<=10.5)
@@ -88,6 +89,22 @@ d<-d[class%in%c("Aves"),]
 d<-d[countryCode%in%c("US","CA"),]
 d<-d[!stateProvince%in%c("Hawaii"),]
 d<-d[species!="",]
+
+
+### Add family common names
+fam<-unique(d$family)
+fnames<-lapply(fam,function(i){
+  print(i)
+  x<-fromJSON(paste0("https://api.inaturalist.org/v1/search?q=",i,"&sources=taxa&per_page=30"))$results$record  
+  x[which(x$matched_term==i),c("name","rank","matched_term","preferred_common_name")]
+})
+fnames<-do.call("rbind",fnames)
+fnames<-setDT(cbind(family=fam,fnames))
+fnames[,fname:=preferred_common_name]
+fnames[,fname:=gsub(", and"," and",fname)]
+d<-d[fnames[,c("family","fname")],on="family"]
+
+
 
 ### Manually replace certain names
 

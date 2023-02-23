@@ -1,4 +1,7 @@
  
+
+# nohup bash run.sh > nohup.out 2>&1 &
+
 source("/data/sdm_rbq/functions.r")
 
 if(FALSE){
@@ -10,13 +13,26 @@ if(FALSE){
 
 library(terra)
 library(sf)
+library(data.table)
 library(concaveman)
 library(future)
 library(future.apply)
 library(future.callr)
 library(viridisLite)
 library(magick)
+library(FNN)
+library(INLA)
+library(mapSpecies)
+library(progressr)
 
+print(paste("Loading data",Sys.time(),collapse=" "))
+
+load("/data/sdm_rbq/parameters.RData")
+op<-rast(opwrap)
+predictors<-rast(predictorswrap)
+r<-rast(rwrap)
+source("/data/sdm_rbq/functions.r",echo=TRUE)
+source("/data/sdm_rbq/inputs.r",echo=TRUE)
 
 ### This runs models for each species and produces necessary model outputs
 # The number of cores used is adjusted according to the number of species
@@ -43,12 +59,17 @@ plan(multisession,workers=min(c(3,length(species))))
 cores<-nbrOfWorkers() # get nbr of workers from the chosen plan
 #plan(sequential)
 options(future.globals.maxSize = 5000 * 1024 ^ 2)
+options(progressr.enable=TRUE)
 
+print(paste(species,collapse=" "))
 
 ml<-future_lapply(seq_along(species),function(j){
 
-#sink("/data/sdm_rbq/graphics/output.txt", append=TRUE)
+prog<-progressr::progressor(along = species) # progressr messages not working
+prog(message = sprintf("Starting %s", species[j]))
+
 sp<-species[j] 
+print(paste(Sys.time(),"Running species",sp,collapse=" "))
 be<-unlist(ed[match(sp,ed$scientific_name),c("start","end")])
 
 ### all obs for period
@@ -107,9 +128,6 @@ obs<-unique(obs,by=c("recordedBy","species","cell"))
 ### species obs
 spobs<-obs[species==sp,]
 #spobs<-target ### for common nighthawk
-
-
-
 
 #rev(sort(table(spobs$recordedBy)))[1:5]
 #plot(spobs$x[spobs$recordedBy=="Bill Chambers"],spobs$y[spobs$recordedBy=="Bill Chambers"],xlim=c(1935,1940))
@@ -214,6 +232,7 @@ if(TRUE){
   if(!is.null(x)){
     x<-c(x,paste0(x,rep(2:6,each=length(x))))
     vars<-vars_pool[!vars_pool%in%x]
+    vars<-unique(c("tmean",vars)) # always keep tmean as a simple if coverage is low
   }else{
     vars<-vars_pool
   }
@@ -226,11 +245,11 @@ formula<-f
 sPoints<-st_as_sf(spobs,coords=c("x","y"),crs=crsr)
 #explanaMesh<-explana
 ppWeight<-weights
-prior.range<-c(50,0.01)
-prior.sigma<-c(1,0.01)
+prior.range<-c(50,0.1)
+prior.sigma<-c(1,0.1)
 smooth<-3/2
-num.threads<-4:4
-blas.num.threads<-4
+num.threads<-1:1
+blas.num.threads<-1
 many<-TRUE
 control.inla<-list(strategy="adaptive",int.strategy="eb",huge=TRUE) # adaptive, eb
 fix<-NULL
@@ -365,7 +384,7 @@ if(TRUE){
 
 
 
-  
+verbose<-TRUE  
 checkpoint("Running model")
 model <- inla(formule, 
               family = "poisson", 
@@ -375,16 +394,18 @@ model <- inla(formule,
               num.threads=4:4,
               blas.num.threads=4,
               control.inla=list(strategy="adaptive",int.strategy="eb",huge=TRUE,
-              control.vb=list(enable=TRUE, verbose=TRUE)),
+              control.vb=list(enable=TRUE, verbose=verbose)),
               inla.mode="experimental",
               control.fixed=bpriors,
               control.compute=list(config=TRUE,openmp.strategy="pardiso"),
-              verbose=TRUE
+              verbose=verbose
              )
 
 
 nameRes <- names(model)
   
+prog(message = sprintf("Model done %s", species[j]))
+
 #=============
 # Return model
 #=============
@@ -425,7 +446,9 @@ colmean<-colo.scale(1:200,c("#EEEFF0","#98abc5", "#8a89a6", "#7b6888", "#6b486b"
 
 checkpoint("Chull reach asymptote?")
 rh<-rangeHull(sPoints,species=sp,breaks=200)
+checkpoint("Plot stabilization")
 stabHull(sp,rh=rh)
+checkpoint("Plot done")
 rh<-rh$reach
 
 
@@ -504,6 +527,8 @@ write.table(results,file="/data/sdm_rbq/graphics/mapSpeciesres.csv",row.names=FA
 print(j) 
 res
 
+prog(message = sprintf("Results done %s", species[j]))
+
 }, future.packages = "data.table", future.seed=TRUE)
 plan(sequential)
 
@@ -511,7 +536,8 @@ plan(sequential)
 ### clear old results
 res<-rev(sort(list.files("/data/sdm_rbq/graphics",pattern="mapSpeciesres",full=TRUE)))[1]
 df<-read.table(res,sep=",",header=TRUE)
-df<-df[rev(order(df$date)),][!duplicated(df$species),]
+df<-df[rev(order(df$date)),]
+df<-df[!duplicated(df$species),]
 #tz<-as.POSIXct(df$date)
 #attr(tz,"tzone")<-"Indian/Reunion"
 #df$date<-tz
@@ -538,15 +564,16 @@ write.table(df,file="/data/sdm_rbq/graphics/mapSpeciesres.csv",row.names=FALSE,s
 
 
 species
-i<-1
-sp<-species[i]
-mpp<-ml[[i]]$mpp
-sdm<-rast(paste0("/data/sdm_rbq/rasters/",gsub(" ","_",species[i]),"_birds.tif"))
-occs<-st_as_sf(ml[[i]]$spobs,coords=c("x","y"),crs=crsr)
-dmesh<-ml[[i]]$dmesh
-sdmf<-mapSpace(modelSpace=mpp,dims=round(1*c(1,1)*dims/4,0),sPoly=NULL,sample=TRUE)#[[type]]
+#i<-1
+#sp<-species[i]
+#mpp<-ml[[i]]$mpp
+#sdm<-rast(paste0("/data/sdm_rbq/rasters/",gsub(" ","_",species[i]),"_birds.tif"))
+#occs<-st_as_sf(ml[[i]]$spobs,coords=c("x","y"),crs=crsr)
+#dmesh<-ml[[i]]$dmesh
+#sdmf<-mapSpace(modelSpace=mpp,dims=round(1*c(1,1)*dims/4,0),sPoly=NULL,sample=TRUE)#[[type]]
+#system(paste("code",paste0("/data/sdm_rbq/sdms/",paste0("birds_",gsub(" ","_",species[i]),".png"))), wait=FALSE)
 
-system(paste("code",paste0("/data/sdm_rbq/sdms/",paste0("birds_",gsub(" ","_",species[i]),".png"))), wait=FALSE)
+head(df,10)
 
 #####################################
 #####################################

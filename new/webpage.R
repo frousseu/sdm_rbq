@@ -8,9 +8,53 @@ Sys.setlocale("LC_ALL","English")
 
 if(FALSE){
   
-  system("powershell -command \"scp -p rouf1703@pose.vhost33:/data/sdm_rbq/figures C:/Users/God/Downloads/images\"",intern=TRUE)
-  system("powershell -command \"scp -p rouf1703@pose.vhost33:'/data/sdm_rbq/marginaleffects' C:/Users/God/Downloads/images\"",intern=TRUE)
-  system("powershell -command \"scp -p rouf1703@pose.vhost33:'/data/sdm_rbq/temp/*_{sd_small,ebird_small,sdm_small,spatial_small,obs_small}.png' C:/Users/God/Downloads/images\"",intern=TRUE)
+  system("powershell -command \"scp -p rouf1703@pose.vhost33:'/data/sdm_rbq/pics/pics.zip' C:/Users/God/Downloads/images\"",intern=TRUE)
+  system("powershell -command \"scp -p rouf1703@pose.vhost33:'/data/sdm_rbq/temp/temp.zip' C:/Users/God/Downloads/images\"",intern=TRUE)
+  system("powershell -command \"scp -p rouf1703@pose.vhost33:'/data/sdm_rbq/marginaleffects/marginaleffects.zip' C:/Users/God/Downloads/images\"",intern=TRUE)
+  system("powershell -command \"scp -p rouf1703@pose.vhost33:'/data/sdm_rbq/overlap/overlap.zip' C:/Users/God/Downloads/images\"",intern=TRUE)
+  system("powershell -command \"scp -p rouf1703@pose.vhost33:'/data/sdm_rbq/stab/stab.zip' C:/Users/God/Downloads/images\"",intern=TRUE)
+  system("powershell -command \"scp -p rouf1703@pose.vhost33:'/data/sdm_rbq/figures/figures.zip' C:/Users/God/Downloads/images\"",intern=TRUE)
+  system("powershell -command \"scp -p rouf1703@pose.vhost33:'/data/sdm_rbq/graphics/mapSpeciesres.csv' C:/Users/God/Downloads/images\"",intern=TRUE)
+ 
+  system("powershell -command \"Get-ChildItem 'C:/Users/God/Downloads/images' -Filter *.zip | Expand-Archive -DestinationPath 'C:/Users/God/Downloads/images' -Force\"",intern=TRUE)
+  
+
+  
+  
+  png("C:/Users/God/Downloads/rejected.png",width=500,height=500,units="px")
+  par(mar=c(0,0,0,0))
+  plot(0.5,0.5,axes=FALSE,xaxt="n",yaxt="n",pch=1,lwd=20,cex=80,xlim=0:1,ylim=0:1)
+  lines(c(0.17,0.83),c(0.17,0.83),lwd=20)
+  dev.off()
+  im<-image_read("C:/Users/God/Downloads/rejected.png")
+  im<-image_trim(im)
+  im<-image_scale(im,"500")
+  im<-image_quantize(im,2)
+  table(image_raster(im)[,3])
+  im<-image_transparent(im,"#ffffffff",fuzz=1)
+  rejected<-image_fill(im,"#00000033","+250+1")
+  #image_write(im,"C:/Users/God/Downloads/rejected.png")
+  #file.show("C:/Users/God/Downloads/rejected.png")
+  #sdm<-image_read("C:/Users/God/Downloads/images/Setophaga_petechia_sdm_small.png")
+  #plot(sdm)
+  #plot(im,add=TRUE)
+  #im<-image_composite(sdm,im)
+  #image_write(im,"C:/Users/God/Downloads/rejected.png")
+  #file.show("C:/Users/God/Downloads/rejected.png")
+  
+  
+  df<-read.csv("C:/Users/God/Downloads/images/mapSpeciesres.csv")
+  w<-which(df$reach<0.85)
+  invisible(lapply(w,function(i){
+    path<-paste0("C:/Users/God/Downloads/images/",gsub(" ","_",df$species[i]),"_sdm_small.png")  
+    if(file.exists(path)){
+      sdm<-image_read(path)
+      #plot(sdm)
+      im<-image_composite(sdm,rejected)
+      #plot(im)
+      image_write(im,path)
+    }
+  }))
   
 }
 
@@ -132,7 +176,7 @@ species<-function(sp,url,copyright,ebirdurl,common,period,n){
 <section class=\"section\">
   <header>
     <button class=\"showmore\" onclick=\"showmorefirst('",sp,"','panel1","')\">&nbsp&nbsp&nbsp&nbspObservations and stabilization &#8628</button>
-    <button class=\"showmore\" onclick=\"showmorefirst('",sp,"','panel2","')\">Predictors only, spatial effect and SD &#8628</button>
+    <button class=\"showmore\" onclick=\"showmorefirst('",sp,"','panel2","')\">Predictors only and spatial effect &#8628</button>
   </header>
   <div class=\"row\" id=\"",sp,"panelfirst\">
     <div class=\"col1\" id=\"",sp,"panel1\">
@@ -149,18 +193,18 @@ species<-function(sp,url,copyright,ebirdurl,common,period,n){
 
 <section class=\"section\">
   <header>
-    <button class=\"showmore\" onclick=\"showmoresecond('",sp,"','panel3","')\">&nbsp&nbsp&nbsp&nbspMapping uncertainty &#8628</button>
-    <button class=\"showmore\" onclick=\"showmoresecond('",sp,"','panel4","')\">Effect of predictors &#8628</button>
+    <button class=\"showmore\" onclick=\"showmoresecond('",sp,"','panel3","')\">&nbsp&nbsp&nbsp&nbspSD, pixelation and animated uncertainty &#8628</button>
+    <button class=\"showmore\" onclick=\"showmoresecond('",sp,"','panel4","')\">Marginal effects of predictors &#8628</button>
   </header>
   <div class=\"row\" id=\"",sp,"panelsecond\">
     <div class=\"col1\" id=\"",sp,"panel3\">
       <img style=\"height: 17vw; padding: 0px;\" src=\"",file.path(src,sp),"_sd_small.png\" alt=\"\">
-      <img style=\"height: 17vw; padding: 0px; opacity: 0;\" src=\"",file.path(src,sp),"_sd_small.png\" alt=\"\">
       <img style=\"height: 17vw; padding: 0px;\" src=\"",file.path(src,sp),"_pixelation_small.png\" alt=\"\">
+      <img style=\"height: 17vw; padding: 0px; opacity: 0;\" src=\"",file.path(src,sp),"_sd_small.png\" alt=\"\">
       <img style=\"height: 17vw; padding: 0px;\" src=\"",file.path(src,sp),"_gif.gif\" alt=\"\">
     </div>
     <div class=\"col2\" id=\"",sp,"panel4\">
-      <img style=\"height: 30vw; padding: 0px;\" src=\"",file.path(src,sp),"_me_small.png\" alt=\"\">
+      <img style=\"height: 29vw; padding: 0px;\" src=\"",file.path(src,sp),"_me_small.png\" alt=\"\">
     </div>
   </div>
 </section>

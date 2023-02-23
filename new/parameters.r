@@ -311,9 +311,23 @@ o[sapply(o,function(i){length(i)==0L})] <- NA
 d[,dmesh:=unlist(o)]
 rm(s);gc()
 
+
 ######################################################
 ### Recompute totobs
 d[,totobs:=.N,by=.(species)]
+
+
+######################################################
+### Save .RData
+
+#ls()[sapply(sapply(ls(),function(i){class(get(i))=="SpatRaster"}),any)]
+#rm(g)
+
+#opwrap<-wrap(op)
+#predictorswrap<-wrap(predictors)
+#rwrap<-wrap(r)
+#save.image("/data/sdm_rbq/parameters.RData")
+
 
 
 

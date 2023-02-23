@@ -168,16 +168,18 @@ stabHull<-function(species,path="/data/sdm_rbq/stab",rh=NULL){
   expo<-floor(log(max(as.numeric(areas)),base=10))
   png(file.path(path,paste0(gsub(" ","_",species),"_stab.png")),width=9,height=8,units="in",res=200,pointsize=11)
   par(mar=c(4,4.5,1,1))
-  ylim<-c(0,max(c(rh$a,max(areas)))*1.05)
+  ylim<-c(0,max(c(rh$a,max(areas)),na.rm=TRUE)*1.05)
   plot(rh$n,areas,ylim=ylim,yaxt="n",xaxt="n",xlab="",ylab="",col="black",bg=adjustcolor("black",0.25),pch=21,cex=2.5)
   axis(1,tcl=-0.3,mgp=c(2,0.5,0),cex.axis=1.5,lwd=0,lwd.ticks=1)
   axis(2,las=2,tcl=-0.3,mgp=c(2,0.5,0),cex.axis=1.5,lwd=0,lwd.ticks=1,at=pretty(areas),labels=pretty(areas)/10^expo)
-  abline(h=rh$a,lty=3,lwd=8,col="black")
   vs<-0:max(rh$n)
-  lines(vs,predict(rh$model,data.frame(X=vs)),lwd=8,col="black")
+  if(!isTRUE(rh$model)){
+    abline(h=rh$a,lty=3,lwd=8,col="black")
+    lines(vs,predict(rh$model,data.frame(X=vs)),lwd=8,col="black")
+  }
   #box(col="snow2",lwd=5)
   box(col="white",lwd=2)
-  grid(lty=3,col=adjustcolor("black",0.2))
+  grid(lty=3,col=adjustcolor("black",0.3),lwd=2)
   mtext(side=1,line=2.5,cex=2.5,font=2,text="Number of locations sampled")
   mtext(side=2,line=2,cex=2.5,font=2,text=bquote(bold("Convex Hull Area "%*%~10^.(expo)~km^2)))
   mtext(side=1,line=-5,adj=0.8,cex=4.5,font=2,text=round(rh$reach,2),col="grey20")
@@ -253,7 +255,15 @@ naplot<-function(lwd=0.25){
 getobs<-function(sp){
   be<-unlist(ed[match(sp,ed$scientific_name),c("start","end")])
   ### all obs for period
-  obs<-d[md>=be[1] & md<=be[2],]
+  ### all obs for period
+  if(be[1]<be[2]){
+    obs<-d[md>=be[1] & md<=be[2],]
+  }else{
+    # Tyrannus savanna breeds from nov to jan
+    dr<-substr(seq.Date(as.Date(paste0("2007-",be[1])),as.Date(paste0("2008-",be[2])),by=1),6,10)
+    obs<-d[md%in%dr,]
+  }
+  #obs<-d[md>=be[1] & md<=be[2],]
   ### remove duplicate obs
   obs<-unique(obs,by=c("recordedBy","species","cell"))
   ### species obs
@@ -383,6 +393,7 @@ roundIm<-function(url,file,path,link=NULL,license=NULL,author=NULL,open=FALSE){
   organism<-image_fill(organism,"none",point="+5+5",fuzz=1)
   organism<-image_trim(organism,fuzz=0)
   organism<-image_scale(organism,"250")
+  organism<-image_quantize(organism,200,dither=FALSE)
   image_write(organism,file.path(path,paste0(file,"_pic.png")),format="png",comment=link)
   tags<-c("-overwrite_original",paste0("-ImageDescription=",link),paste0("-Copyright=",license))
   #print(tags)
@@ -509,7 +520,7 @@ vnames<-list(
 
 #m<-mpp
 class(m)<-"inla"
-samples<-inla.posterior.sample(nsims,m,num.threads="2:2")
+samples<-inla.posterior.sample(nsims,m,num.threads="1:1")
 
 params<-dimnames(m$model.matrix)[[2]]
 nparams<-sapply(params,function(i){
@@ -599,7 +610,7 @@ lapply(names(preds),function(i){
   yaxt<-ifelse(match(i,names(preds))%in%seq(1,mfrow[1]*mfrow[2],by=mfrow[2]),"s","n")
   plot(0.1,0.1,xlab="",ylab="",xlim=xlim,ylim=ylim,type="n",mgp=c(2,0.15,0),tcl=-0.1,log="",xaxt=xaxt,yaxt=yaxt)
   box(col="white",lwd=2)
-  grid(lty=3,col=adjustcolor("black",0.2))
+  grid(lty=3,col=adjustcolor("black",0.3))
 
   if(i=="logdistance"){
     c(1,2.3,9.1,11)/10
@@ -656,7 +667,7 @@ posterior<-function(param,name){
   xy2<-rbind(xy,xy2)
   plot(xy[,1],xy[,2],xlim=c(min(xy[,1]),xy[,1][max(which(xy[,2]>(max(xy[,2])*0.025)))+1]),type="n",xlab="",ylab="",mgp=c(2,0.25,0),tcl=-0.1)
   box(col="white",lwd=2)
-  grid(lty=3,col=adjustcolor("black",0.2))
+  grid(lty=3,col=adjustcolor("black",0.3))
   polygon(xy2[,1],xy2[,2],border=NA,col=adjustcolor("black",0.10))
   lines(xy[,1],xy[,2],lwd=1,col=adjustcolor("black",0.25))
   abline(v=m$summary.hyperpar[i,][,"mean"],lwd=3,col=adjustcolor("black",0.50))
@@ -724,6 +735,7 @@ animate<-function(sdm,sp){
   img<-lapply(lf,image_read)
   img<-do.call("c",img)
   img<-image_scale(img,"x450")
+  img<-image_quantize(img,max=100,dither=TRUE)
   animation <- image_animate(img, fps = 10, optimize = TRUE)
   image_write(animation,paste0("/data/sdm_rbq/figures/",gsub(" ","_",sp),"_gif.gif"))
 }

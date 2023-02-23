@@ -6,16 +6,18 @@ library(mapSpecies)
 species<-c("Setophaga pinus","Setophaga americana","Setophaga petechia","Setophaga citrina","Setophaga ruticilla","Setophaga virens")
 species<-c("Dolichonyx oryzivorus")
 species<-c("Leucosticte australis","Toxostoma bendirei","Haematopus palliatus","Setophaga americana")#[4]
-species<-c("Tyrannus savana")
+species<-c("Cardellina pusilla")
 tab<-table(d$species)
 tab<-names(tab)[tab>30]
 tab<-tab[d$ebird[match(tab,d$ebird)]%in%ed$scientific_name]
 set.seed(sample(1:10000,9))
 df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
-dontsp<-df$species[!is.na(df$I)]
+#dontsp<-df$species[!is.na(df$I)]
+dontsp<-df$species
 tab<-tab[!tab%in%dontsp]
-species<-sample(tab,3)
-#species<-df$species[1:17]
+species<-sample(tab,12)
+species<-species[sapply(species,function(i){nrow(getobs(i))>5})]
+stopifnot(length(species)>0)
 (lspecies<-species)
 d[species%in%lspecies,][,.(n=.N),by=.(species)]
 
@@ -84,6 +86,7 @@ vars_pool<-c("tmean","tmean2","deciduous_esa","builtup_esa","crop_esa","grass_es
 #os<-os[rev(order(unlist(os)))]
 #lapply(os,format,units="Gb")
 
+species
 
 ##########################################################
 ##########################################################
@@ -125,6 +128,6 @@ target<-unique(target,by=c("recordedBy","species","cell"))
 
 }
 
-species
+
 
 
