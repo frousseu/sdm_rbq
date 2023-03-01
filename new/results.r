@@ -43,7 +43,10 @@ ebirdpath<-ebirdpath[unlist(sapply(ebirdnames,function(i){grep(i,ebirdpath)}),us
 
 ebird<-rast(lapply(ebirdpath,rast))
 names(ebird)<-gsub("_ebird2.tif","",basename(ebirdpath))
-#ebird<-project(ebird,sdms[[1]])
+# remove ebird models with values of 0 in NA
+glob<-global(ebird,"max",na.rm=TRUE)
+ebird<-ebird[[!names(ebird)%in%rownames(glob[glob$max==0,,drop=FALSE])]]
+
 sdms<-sdms[[names(ebird)]]
 #ebird<-project(ebird,crs(na))
 #ebird<-crop(ebird,na)
@@ -59,6 +62,15 @@ cors<-sapply(seq_len(nlyr(sdms)),function(i){
   #nicheOverlap(raster(sdms[[i]]),raster(ebird[[i]]),stat="I")
 })
 cors
+
+#n<-10
+#r1<-rast(matrix(1:n^2,ncol=n))#sdms[[i]]
+#r2<-rast(matrix(1:n^2,ncol=n)+runif(n^2,10,100))#ebird[[i]]
+#r1[sample(1:ncell(r1),70)]<-NA
+#r2[sample(1:ncell(r2),70)]<-NA
+#cor(values(r1)[,1],values(r2)[,1],use="complete.obs",method="pearson")
+#layerCor(c(r1,r2),"pearson",na.rm=TRUE)
+
 
 ### nicheOverlap
 cl<-makeCluster(21)

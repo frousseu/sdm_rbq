@@ -268,8 +268,10 @@ getobs<-function(sp){
   obs<-unique(obs,by=c("recordedBy","species","cell"))
   ### species obs
   spobs<-obs[species==sp,]
-  nndist<-knn.dist(as.matrix(spobs[,c("x","y")]),k=1)[,1]
-  spobs<-spobs[nndist<=1200,]
+  if(nrow(spobs)>=3){
+    nndist<-knn.dist(as.matrix(spobs[,c("x","y")]),k=1)[,1]
+    spobs<-spobs[nndist<=1200,]
+  }
   st_as_sf(spobs,coords=c("x","y"),crs=crsr)
 }
 

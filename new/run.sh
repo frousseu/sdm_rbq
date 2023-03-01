@@ -4,7 +4,7 @@
 #rm nohup.out
 #touch nohup.out
 rm verbose.out
-nbruns=3
+nbruns=1
 for i in $(seq 1 1 $nbruns)
 do
   echo "Run $i/$nbruns"

@@ -3,6 +3,7 @@
 library(exiftoolr)
 library(stringi)
 library(ebirdst)
+library(magick)
 
 Sys.setlocale("LC_ALL","English")
 
@@ -44,7 +45,7 @@ if(FALSE){
   
   
   df<-read.csv("C:/Users/God/Downloads/images/mapSpeciesres.csv")
-  w<-which(df$reach<0.85)
+  w<-which(df$reach<0.85 | is.na(df$reach))
   invisible(lapply(w,function(i){
     path<-paste0("C:/Users/God/Downloads/images/",gsub(" ","_",df$species[i]),"_sdm_small.png")  
     if(file.exists(path)){
@@ -114,10 +115,20 @@ species_list$period<-ifelse(is.na(start),"Resident",paste(start,end,sep=" / "))
 df<-read.csv("C:/Users/God/Downloads/images/mapSpeciesres.csv")
 m<-match(gsub("_"," ",species_list$sp),df$species)
 species_list$n<-df$n[m]
-
+species_list$family<-df$fname[m]
 species_list<-species_list[order(match(species_list$common,ebird$common)),]
+species_list<-species_list[order(factor(species_list$family,levels=unique(species_list$family))),] # some in ebird appear unordered
 
-species_list<-species_list#[1:15,]
+#species_list$family<-sort(rep(LETTERS[1:20],length.out=nrow(species_list)))
+#species_list<-species_list[sample(1:5,20,replace=TRUE),]
+#species_list<-species_list[order(species_list$family),]
+toc_species<-rep(unique(species_list$family),times=rle(species_list$family)[[1]]+1)
+toc_ref<-rep(unique(species_list$sp),times=as.integer(!duplicated(species_list$family))+1)
+toc_common<-rep(unique(species_list$common),times=as.integer(!duplicated(species_list$family))+1)
+toc_species<-ifelse(duplicated(toc_ref,fromLast=TRUE),paste0("<b>",toc_species,"</b>"),paste0("&nbsp;&nbsp;",toc_common))
+head(data.frame(toc_ref,toc_species))
+
+
 
 #src<-"https://res.cloudinary.com/dphvzalf9/image/upload"
 src<-"images"
@@ -570,12 +581,36 @@ header {
 <body>
 <div style=\"display:inline-block; width:100%;\">
 <div class=\"left\">"
-,paste(paste0("<a class=\"toc\" href=\"#",species_list$sp,"\">",species_list$common,"</a>"),collapse="<br>\n"),
+,paste(paste0("<a class=\"toc\" href=\"#",toc_ref,"\">",toc_species,"</a>"),collapse="<br>\n"),
 "</div>
 <div class=\"right\">
 <h1>SDM from mapSpecies and comparison with eBird</h1>
 
 <p>This page displays the species distribution models obtained with mapSpecies and associated results along with the abundance models from <a class=\"text\" target=\"blank\" href=\"https://ebird.org\">eBird</a> for comparison. All observations used for the mapSpecies models come from <a class=\"text\" target=\"blank\" href=\"https://www.inaturalist.org\">iNaturalist</a> and were obtained through the <a class=\"text\" target=\"blank\" href=\"https://doi.org/10.15468/ab3s5x\">iNaturalist Research-grade Observations</a> dataset hosted on <a class=\"text\" target=\"blank\" href=\"https://www.gbif.org\">GBIF</a>. The eBird models are part of <a class=\"text\"  target=\"blank\" href=\"https://science.ebird.org/en/status-and-trends\">The Status and Trends product</a> <a class=\"text\" target=\"blank\" href=\"https://doi.org/10.2173/ebirdst.2021\">(Fink et al. 2022)</a> and can be accessed through the <a class=\"text\" target=\"blank\" href=\"https://cornelllabofornithology.github.io/ebirdst/index.html\">ebirdst</a> R package. The abundance models from eBird are available online and a link to the ebird model is provided in each species account. The models are either for the breeding period or for the whole year when a species is a resident. The breeding period used for the models is the same as the one used by eBird.</p>
+
+<hr class=\"vspace\"> 
+<h2 id=\"Results\" class=\"h2\">Paper figures</h2> 
+<figure>
+  <img style=\"height: 75vh; padding: 0px;\" src=\"",file.path(src,"visual_abstract.png"),"\" alt=\"\">
+  <figcaption>Figure 1.</figcaption>
+</figure><br>
+<figure>
+  <img style=\"height: 50vh; padding: 0px;\" src=\"",file.path(src,"overlap.png"),"\" alt=\"\">
+  <figcaption>Figure 2.</figcaption>
+</figure><br>
+<figure>
+  <img style=\"height: 45vh; padding: 0px;\" src=\"",file.path(src,"spatial_effect.png"),"\" alt=\"\">
+  <img style=\"height: 45vh; padding: 0px;\" src=\"",file.path(src,"effort_effect.png"),"\" alt=\"\">
+  <figcaption>Figure 3.</figcaption>
+</figure><br>
+<figure>
+  <img style=\"height: 100vh; padding: 0px;\" src=\"",file.path(src,"bird_maps.png"),"\" alt=\"\">
+  <figcaption>Figure 5.</figcaption>
+</figure><br>
+<figure>
+  <img style=\"height: 100vh; padding: 0px;\" src=\"",file.path(src,"results_detailed.png"),"\" alt=\"\">
+  <figcaption>Figure 6.</figcaption>
+</figure><br>
 
 
 <hr class=\"vspace\"> 

@@ -316,6 +316,18 @@ rm(s);gc()
 ### Recompute totobs
 d[,totobs:=.N,by=.(species)]
 
+######################################################
+### Species pool
+
+# build list of species available for modeling and comparing with eBird
+
+#species_pool<-unique(d$species)
+#speciesn<-unique(d[,c("species","ebird")])
+#ebirdpath<-list.files("/data/predictors_sdm/expert_maps/eBird/abundance",full=TRUE,pattern="_ebird2.tif")
+#ebirdpath<-ebirdpath[unlist(sapply(ebirdnames,function(i){grep(i,ebirdpath)}),use.names=FALSE)]
+#ebird<-rast(lapply(ebirdpath,rast))
+#names(ebird)<-gsub("_ebird2.tif","",basename(ebirdpath))
+
 
 ######################################################
 ### Save .RData
@@ -326,8 +338,14 @@ d[,totobs:=.N,by=.(species)]
 #opwrap<-wrap(op)
 #predictorswrap<-wrap(predictors)
 #rwrap<-wrap(r)
+#rm(op,predictors,r)
 #save.image("/data/sdm_rbq/parameters.RData")
 
+### Create result file
+#df<-data.frame(matrix(ncol = 15, nrow = 0))
+#colnames(df)<-c("species", "date", "n", "reach", "predictors", "range", "sd", "pearson", "spearman", "I", "D", "hullarea","family","fname","order")
+#write.table(df,file="/data/sdm_rbq/graphics/mapSpeciesres.csv",row.names=FALSE,header=TRUE,sep=",",append=FALSE)
+#df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
 
 
 
@@ -525,11 +543,6 @@ x$species
 }
 
 
-### Create result file
-#df<-data.frame(matrix(ncol = 10, nrow = 0))
-#colnames(df)<-c("species","date","n","reach","predictors","range","sd","pearson","spearman","I","D")
-#write.table(df,file="/data/sdm_rbq/graphics/mapSpeciesres.csv",row.names=FALSE,header=TRUE,sep=",",append=FALSE)
-#df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
 
 
 #############################################################

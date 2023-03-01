@@ -3,6 +3,9 @@
 
 # find -mtime -1 -ls | wc -l
 
+# nohup Rscript figures_web.r --no-save > verbose.out 2>&1 &
+
+
 library(tidyr)
 library(foreach)
 library(doParallel)
@@ -14,6 +17,11 @@ library(exiftoolr)
 library(colorspace)
 
 options(vsc.dev.args = list(width = 1000, height = 800))
+
+code<-readLines("/data/sdm_rbq/models.r",n=360) # load everything first
+code<-code[1:grep("Data loaded",code)]
+code<-paste(code,collapse="\n")
+source(textConnection(code))
 
 
 ########################################################################
@@ -39,16 +47,18 @@ stopCluster(cl)
 ### Species pics #####################################################
 ######################################################################
 
+if(FALSE){
 
 path<-"/data/sdm_rbq/pics"
 
 df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
 #sps<-c("Buteo jamaicensis","Buteo lagopus","Buteo platypterus")
 sps<-sort(df$species)#[1:18]
-#sps<-sps[165:length(sps)]
+#sps<-sps[544:length(sps)]
 #i<-c("Acanthis hornemanni")
 #sps<-i#c("Columba livia")
 
+ # run if needed
 lapply(sps,function(i){
   print(i)
   links<-getCC0links(i,license=c("cc0"))
@@ -80,13 +90,18 @@ lapply(sps,function(i){
   print(i)
 })
 
+}
+
 #exif_read(path = "/data/sdm_rbq/pics/Acanthis_hornemanni_pic.png", #tags = "*Copyright*")$Copyright
 
 
-
+###################################################################
 ###################################################################
 ### Stabilization graphs ##########################################
 ###################################################################
+###################################################################
+
+if(FALSE){ # already ran with modelss
 
 lf<-list.files("/data/sdm_rbq/stab/")
 lf<-sapply(strsplit(lf,"_"),function(i){paste(i[1:2],collapse=" ")})
@@ -99,12 +114,15 @@ sp<-df$species
 #cl<-makeCluster(2)
 #registerDoParallel(cl)
 #foreach(i=sp) %dopar% {
+ 
 lapply(sp,function(i){
   print(i)
   sPoints<-getobs(i)
   rh<-rangeHull(sPoints,species=i,breaks=200)
   stabHull(i,rh=rh)
 })
+
+}
 #}
 #stopCluster(cl)
 
@@ -140,8 +158,8 @@ lsp<-unique(df$species)#[1]
 #cores<-nbrOfWorkers() # get nbr of workers from the chosen plan
 #chunks <- split(1:length(lsp), rep(1:cores, each=ceiling(length(lsp)/cores))[1:length(lsp)])
 
-#cl<-makeCluster(20)
-#registerDoParallel(cl)
+cl<-makeCluster(20)
+registerDoParallel(cl)
 foreach(i=lsp,.packages=c("sf","terra","magick","FRutils","data.table","FNN","colorspace")) %dopar% {
 #res<-future_lapply(chunks,function(chunksi){
   print(i)
@@ -263,8 +281,8 @@ stopCluster(cl)
 cl<-makeCluster(20)
 registerDoParallel(cl)
 "/data/sdm_rbq/temp"
-lsp<-list.files("/data/sdm_rbq/temp",full=TRUE)
-lsp<-lsp[-grep("_small.|.zip",lsp)]
+lsp<-list.files("/data/sdm_rbq/temp",full=TRUE,pattern=".png")
+lsp<-lsp[-grep("_small.",lsp)]
 #lsp<-lsp[grep("Spizella_pallida",lsp)]
 foreach(i=lsp,.packages=c("magick")) %dopar% {
   image_read(i) |>
@@ -276,10 +294,10 @@ stopCluster(cl)
 
 
 ### marginal effects
-cl<-makeCluster(20)
+cl<-makeCluster(10)
 registerDoParallel(cl)
-lsp<-list.files("/data/sdm_rbq/marginaleffects",full=TRUE)
-lsp<-lsp[-grep("_small.|.zip",lsp)]
+lsp<-list.files("/data/sdm_rbq/marginaleffects",full=TRUE,pattern=".png")
+lsp<-lsp[-grep("_small.",lsp)]
 #lsp<-lsp[grep("Dendrocygna",lsp)]
 foreach(i=lsp,.packages=c("magick")) %dopar% {
   image_read(i) |>
@@ -290,10 +308,10 @@ stopCluster(cl)
 
 
 ### pixelation and gif
-cl<-makeCluster(20)
+cl<-makeCluster(10)
 registerDoParallel(cl)
 lsp<-list.files("/data/sdm_rbq/figures",full=TRUE,pattern=".png")
-lsp<-lsp[-grep("_small.|.zip",lsp)]
+lsp<-lsp[-grep("_small.",lsp)]
 #lsp<-lsp[grep("Dendrocygna",lsp)]
 foreach(i=lsp,.packages=c("magick")) %dopar% {
   image_read(i) |>
@@ -308,7 +326,7 @@ stopCluster(cl)
 cl<-makeCluster(20)
 registerDoParallel(cl)
 lsp<-list.files("/data/sdm_rbq/stab",full=TRUE,pattern=".png")
-lsp<-lsp[-grep("_small.|.zip",lsp)]
+lsp<-lsp[-grep("_small.",lsp)]
 foreach(i=lsp,.packages=c("magick")) %dopar% {
   image_read(i) |>
   image_scale("500") |>
@@ -322,7 +340,7 @@ stopCluster(cl)
 cl<-makeCluster(20)
 registerDoParallel(cl)
 lsp<-list.files("/data/sdm_rbq/overlap",full=TRUE,pattern=".png")
-lsp<-lsp[-grep("_small.|.zip",lsp)]
+lsp<-lsp[-grep("_small.",lsp)]
 foreach(i=lsp,.packages=c("magick")) %dopar% {
   image_read(i) |>
   image_scale("500") |>

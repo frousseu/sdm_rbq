@@ -83,7 +83,7 @@ ed$species[ed$species=="Larus canus/brachyrhynchus"]<-"Larus brachyrhynchus"
 #################################################################
 ### Load data ###################################################
 
-cols<-c("class","family","genus","species","infraspecificEpithet","countryCode","stateProvince","decimalLatitude","decimalLongitude","coordinateUncertaintyInMeters","day","month","year","recordedBy","occurrenceID")
+cols<-c("class","order","family","genus","species","infraspecificEpithet","countryCode","stateProvince","decimalLatitude","decimalLongitude","coordinateUncertaintyInMeters","day","month","year","recordedBy","occurrenceID")
 d<-fread("/data/predictors_sdm/inat/0425942-210914110416597.csv",encoding="UTF-8",nThread=10,select=cols) 
 d<-d[class%in%c("Aves"),]
 d<-d[countryCode%in%c("US","CA"),]
@@ -104,8 +104,6 @@ fnames[,fname:=preferred_common_name]
 fnames[,fname:=gsub(", and"," and",fname)]
 d<-d[fnames[,c("family","fname")],on="family"]
 
-
-
 ### Manually replace certain names
 
 # https://stackoverflow.com/questions/67908743/replace-column-values-in-table-with-values-from-lookup-based-on-matches-in-r-usi
@@ -118,26 +116,29 @@ d<-d[fnames[,c("family","fname")],on="family"]
 # american herring gull
 # broad billed hummingbird
 
-changes<-list(
-  c("Setophaga auduboni","Setophaga coronata"),
-  c("Phalacrocorax auritus","Nannopterum auritum"),
-  c("Tyto furcata","Tyto alba"),
-  c("Larus smithsonianus","Larus argentatus"),
+changes<-list( # the rest is transformed below with the tax code
+  #c("Setophaga auduboni","Setophaga coronata"),
+  #c("Phalacrocorax auritus","Nannopterum auritum"),
+  #c("Tyto furcata","Tyto alba"),
+  #c("Larus smithsonianus","Larus argentatus"),
   c("Larus brachyrhynchus","Larus canus/brachyrhynchus"),
-  c("Grus canadensis","Antigone canadensis")
-)
+  c("Buteo nitidus","Buteo plagiatus") # for some reason Buteo plagiatus is Buteo ntidus in iNat GBIF extract
+  #c("Grus canadensis","Antigone canadensis"),
+  #c("Regulus calendula","Corthylio calendula") # Chen
+) 
+#changes<-lapply(changes,rev)
 changes<-as.data.table(do.call("rbind",changes))
 setnames(changes,c("old","new"))
-
 d[changes, species := new, on = .(species = old)]
-
 
 ### Find iNaturalist names from obs IDs
 d[,taxon:=trimws(paste(species,infraspecificEpithet))]
 tax<-unique(d,by="taxon")[,.(taxon,occurrenceID)]
 tax[,obsid:=basename(occurrenceID)]
-ltax<-split(tax$obsid, ceiling(seq_len(nrow(tax))/30))
+ltax<-split(tax$obsid, ceiling(seq_len(nrow(tax))/30)) # chunk API requests
 
+#tax[grep("Buteo plagiatus",tax$taxon),]
+#d[grep("Buteo plagiatus",d$taxon),]
 
 if(FALSE){ # not run if have been ran already
   taxanames<-lapply(seq_along(ltax),function(j){
@@ -161,8 +162,7 @@ if(FALSE){ # not run if have been ran already
 tax<-fread("tax.cvs")
 #tax[,taxon:=gsub("Grus canadensis","Antigone canadensis",taxon)]
 #fwrite(tax,"tax.cvs",row.names=FALSE)
-d<-merge(d,tax[,.(taxon,inat,inat_common)])
-
+d<-merge(d,tax[,.(taxon,inat,inat_common)],all.x=TRUE)
 
 #spnames<-d[,.(n=.N),by=.(species,taxon,inat,inat_common)]
 #spnames[,matched:=inat%in%ed$species | species%in%ed$species | inat_common%in%ed$common_name | sub("^(\\S*\\s+\\S+).*", "\\1",inat)%in%ed$species]
@@ -171,7 +171,6 @@ d<-merge(d,tax[,.(taxon,inat,inat_common)])
 #spnames[matched==TRUE,]
 
 sprasters<-sapply(strsplit(list.files("/data/predictors_sdm/expert_maps/eBird/abundance"),"_"),function(i){paste(i[1:2],collapse=" ")})
-
 
 ### Get ebird names by matching with ebirdst dataset
 spnames<-d[,.(n=.N),by=.(species,taxon,inat,inat_common)]
@@ -190,8 +189,21 @@ lnames<-lapply(unique(d$species),function(i){
 })
 stopifnot(all(sapply(lnames,length)==1))
 lnames<-data.table(species=unique(d$species),ebird=unlist(lnames))
-d<-merge(d,lnames,by="species")
+d<-merge(d,lnames,by="species",all.x=TRUE)
 
+### changes species name for the ones used in ebird for species matching
+snames<-unique(d[,c("species","ebird")])
+ma1<-match(snames$species,ed$species)
+ma2<-match(snames$ebird,ed$species)
+changes<-snames[which(is.na(ma1) & !is.na(ma2)),]
+changes
+changes<-lapply(1:nrow(changes),function(i){
+  unname(as.matrix(changes[i,1:2,])[1,])
+}) 
+changes<-as.data.table(do.call("rbind",changes))
+setnames(changes,c("old","new"))
+d[changes, species := new, on = .(species = old)]
+#table(d$species[grep("Grus|Antigone",d$species)])
 
 #############################
 ### keep screening

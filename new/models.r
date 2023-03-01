@@ -34,6 +34,8 @@ r<-rast(rwrap)
 source("/data/sdm_rbq/functions.r",echo=TRUE)
 source("/data/sdm_rbq/inputs.r",echo=TRUE)
 
+checkpoint("Data loaded")
+
 ### This runs models for each species and produces necessary model outputs
 # The number of cores used is adjusted according to the number of species
 
@@ -260,16 +262,6 @@ control.compute<-list(config=TRUE,openmp.strategy="pardiso.parallel")
 verbose<-TRUE
 
 
-# Function that prints the different steps
-checkpoint<-function(msg=""){
-  if(verbose){
-    cat(paste(Sys.time(),msg,sep=" - "),"\n")
-  }
-}
-
-
-
-  
 #==============
 # Basic objects
 #==============
@@ -520,7 +512,11 @@ results<-data.frame(
     pearson=NA,
     spearman=NA,
     I=NA,
-    D=NA
+    D=NA,
+    hullarea=st_union(sPoints) |> st_convex_hull() |> st_area() |> as.numeric(),
+    family=NA,
+    fname=NA,
+    order=NA
   )
 write.table(results,file="/data/sdm_rbq/graphics/mapSpeciesres.csv",row.names=FALSE,col.names=FALSE,sep=",",append=TRUE)
 
