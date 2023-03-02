@@ -83,7 +83,7 @@ ed$species[ed$species=="Larus canus/brachyrhynchus"]<-"Larus brachyrhynchus"
 #################################################################
 ### Load data ###################################################
 
-cols<-c("class","order","family","genus","species","infraspecificEpithet","countryCode","stateProvince","decimalLatitude","decimalLongitude","coordinateUncertaintyInMeters","day","month","year","recordedBy","occurrenceID")
+cols<-c("class","genus","species","infraspecificEpithet","countryCode","stateProvince","decimalLatitude","decimalLongitude","coordinateUncertaintyInMeters","day","month","year","recordedBy","occurrenceID")
 d<-fread("/data/predictors_sdm/inat/0425942-210914110416597.csv",encoding="UTF-8",nThread=10,select=cols) 
 d<-d[class%in%c("Aves"),]
 d<-d[countryCode%in%c("US","CA"),]
@@ -92,17 +92,17 @@ d<-d[species!="",]
 
 
 ### Add family common names
-fam<-unique(d$family)
-fnames<-lapply(fam,function(i){
-  print(i)
-  x<-fromJSON(paste0("https://api.inaturalist.org/v1/search?q=",i,"&sources=taxa&per_page=30"))$results$record  
-  x[which(x$matched_term==i),c("name","rank","matched_term","preferred_common_name")]
-})
-fnames<-do.call("rbind",fnames)
-fnames<-setDT(cbind(family=fam,fnames))
-fnames[,fname:=preferred_common_name]
-fnames[,fname:=gsub(", and"," and",fname)]
-d<-d[fnames[,c("family","fname")],on="family"]
+#fam<-unique(d$family)
+#fnames<-lapply(fam,function(i){
+#  print(i)
+#  x<-fromJSON(paste0("https://api.inaturalist.org/v1/search?q=",i,"&sources=taxa&per_page=30"))$results$record  
+#  x[which(x$matched_term==i),c("name","rank","matched_term","preferred_common_name")]
+#})
+#fnames<-do.call("rbind",fnames)
+#fnames<-setDT(cbind(family=fam,fnames))
+#fnames[,fname:=preferred_common_name]
+#fnames[,fname:=gsub(", and"," and",fname)]
+#d<-d[fnames[,c("family","fname")],on="family"]
 
 ### Manually replace certain names
 
@@ -140,7 +140,7 @@ ltax<-split(tax$obsid, ceiling(seq_len(nrow(tax))/30)) # chunk API requests
 #tax[grep("Buteo plagiatus",tax$taxon),]
 #d[grep("Buteo plagiatus",d$taxon),]
 
-if(FALSE){ # not run if have been ran already
+if(FALSE){ # not run if have been ran already (only to update taxonomy if needed)
   taxanames<-lapply(seq_along(ltax),function(j){
     print(j)
     i<-ltax[[j]]
@@ -148,21 +148,66 @@ if(FALSE){ # not run if have been ran already
     taxaid<-x$results$taxon$id
     y<-fromJSON(paste0("https://api.inaturalist.org/v1/taxa?taxon_id=",paste(taxaid,collapse=","),"&per_page=500"))
     stopifnot(y$total_results<=500)
-    res<-y$results[match(taxaid,y$results$id),c("name","preferred_common_name")]
+    res<-y$results[match(taxaid,y$results$id),c("name","preferred_common_name","ancestor_ids")]
     res<-res[match(i,x$results$id),]
     res
   })
   taxanames<-do.call("rbind",taxanames)
-  names(taxanames)<-c("inat","inat_common")
+  names(taxanames)<-c("inat","inat_common","ancestors")
   tax<-cbind(tax,taxanames)
+  tax$ancestors<-paste0("-",sapply(tax$ancestors,paste0,collapse="-"),"-") # to help matching later
+
+  fam<-fromJSON("https://api.inaturalist.org/v1/taxa?is_active=true&taxon_id=3&rank=family&per_page=500&order=desc&order_by=observations_count")
+  fam<-fam$results[,c("name","preferred_common_name","id")]
+  fam<-lapply(1:nrow(fam),function(i){
+    g<-grep(paste0("-",fam$id[i],"-"),tax$ancestors)
+    if(any(g)){
+      data.table(
+        taxon=tax$taxon[grep(paste0("-",fam$id[i],"-"),tax$ancestors)],
+        family=fam$name[i],
+        familyname=fam$preferred_common_name[i]
+      )
+    }else{
+      NULL
+    }
+  }) |> rbindlist()
+
+  ord<-fromJSON("https://api.inaturalist.org/v1/taxa?is_active=true&taxon_id=3&rank=order&per_page=500&order=desc&order_by=observations_count")
+  ord<-ord$results[,c("name","preferred_common_name","id")]
+  ord<-lapply(1:nrow(ord),function(i){
+    g<-grep(paste0("-",ord$id[i],"-"),tax$ancestors)
+    if(any(g)){
+      data.table(
+        taxon=tax$taxon[grep(paste0("-",ord$id[i],"-"),tax$ancestors)],
+        order=ord$name[i],
+        ordername=ord$preferred_common_name[i]
+      )
+    }else{
+      NULL
+    }
+  }) |> rbindlist()
+
+  tax<-tax[fam,on="taxon"]
+  tax<-tax[ord,on="taxon"]
+
+  tax[,familyname:=gsub(", and"," and",familyname)]
+  tax[,ordername:=gsub(", and"," and",ordername)]
+
   fwrite(tax,"tax.cvs",row.names=FALSE)
+
 }
 
-### check what happens to subspecies!!!!!! some are discarded
+### get all bird orders and families and match with species
+# check what happens to subspecies!!!!!! some are discarded
 tax<-fread("tax.cvs")
-#tax[,taxon:=gsub("Grus canadensis","Antigone canadensis",taxon)]
-#fwrite(tax,"tax.cvs",row.names=FALSE)
-d<-merge(d,tax[,.(taxon,inat,inat_common)],all.x=TRUE)
+d<-d[tax[,.(taxon,inat,inat_common,family,familyname,order,ordername)],on="taxon"]
+
+#View(unique(d,by="taxon")[,.(species,taxon,family,familyname,order,ordername)])
+
+#taxo<-unique(d,by="species")[,.(species,family,familyname,order,ordername)]
+#df<-df[,-match(c("family","fname","order"),names(df))]
+#df<-merge(df,taxo,all.x=TRUE)
+#df<-df[rev(order(df$date)),]
 
 #spnames<-d[,.(n=.N),by=.(species,taxon,inat,inat_common)]
 #spnames[,matched:=inat%in%ed$species | species%in%ed$species | inat_common%in%ed$common_name | sub("^(\\S*\\s+\\S+).*", "\\1",inat)%in%ed$species]
@@ -205,6 +250,7 @@ setnames(changes,c("old","new"))
 d[changes, species := new, on = .(species = old)]
 #table(d$species[grep("Grus|Antigone",d$species)])
 
+
 #############################
 ### keep screening
 
@@ -234,8 +280,6 @@ d[,.(n=.N),by=.(species,class)][n>200,][,.(n=.N),by=.(class)]
 #d<-d[substr(date,6,10) >= "06-01" & substr(date,6,10) <= "07-25",]
 
 
-
-
 ### build spatial object
 coords<-c("decimalLongitude","decimalLatitude")
 s<-st_as_sf(d[,..coords],coords=coords,crs=4326)
@@ -262,7 +306,6 @@ d<-d[!is.na(cell),]
 checkpoint("Make filter grid done")
 
 #s<-s[!duplicated(as.data.frame(s[,c("recordedBy","species","cell")])[,1:3]),]
-
 
 
 #checkpoint("Rasterize for effort")

@@ -514,9 +514,11 @@ results<-data.frame(
     I=NA,
     D=NA,
     hullarea=st_union(sPoints) |> st_convex_hull() |> st_area() |> as.numeric(),
-    family=NA,
-    fname=NA,
-    order=NA
+    family=d$family[match(res$species,d$species)],
+    familyname=d$familyname[match(res$species,d$species)],
+    order=d$order[match(res$species,d$species)],
+    ordername=d$ordername[match(res$species,d$species)]
+
   )
 write.table(results,file="/data/sdm_rbq/graphics/mapSpeciesres.csv",row.names=FALSE,col.names=FALSE,sep=",",append=TRUE)
 

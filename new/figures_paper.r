@@ -11,7 +11,7 @@ cexrightlab=1.3
 cexleft=0.9
 
 ### I vs groups
-group<-c("fname")
+group<-c("family")
 df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
 df<-merge(df,unique(d[,c("species",..group)]))
 ed2<-merge(ed,df[,c("species",group)])
@@ -22,7 +22,7 @@ df<-df[order(match(df$species,ed$species)),]
 png("/data/sdm_rbq/graphics/groups.png",width=5,height=12,res=300,units="in")
 par(mar=c(2,13,0.5,0.5))
 form<-as.formula(paste0("I~",group))
-if(group=="fname"){ex<-2}else{ex<-0}
+if(group=="family"){ex<-2}else{ex<-0}
 boxplot(form,data=df[which(df$reach>=0.00),],las=2,outline=FALSE,pars=list(lwd=0.01,medlwd=1.5,medcol="grey50"),xaxt="n",yaxt="n",xlab="",ylab="",horizontal=TRUE,xaxs="i",xlim=c(1+ex,nlevels(df[,group])-ex))
 for(i in pretty(0:1)){
     lines(c(i,i),c(-500,500),xpd=FALSE,lty=3,col="grey80",lwd=1)
@@ -30,7 +30,7 @@ for(i in pretty(0:1)){
 for(i in 1:nlevels(df[,group])){
     lines(c(0,1),c(i,i),xpd=FALSE,lty=3,col="grey80",lwd=1)
 }
-points(df$I,jitter(as.integer(df[,group]),fac=if(group=="fname"){0}else{0.75}),cex=0.6,col=adjustcolor("seagreen",0.75),pch=21,lwd=0.75,bg=adjustcolor("seagreen",0.25))
+points(df$I,jitter(as.integer(df[,group]),fac=if(group=="family"){0}else{0.75}),cex=0.6,col=adjustcolor("seagreen",0.75),pch=21,lwd=0.75,bg=adjustcolor("seagreen",0.25))
 at<-1:nlevels(df[,group])
 labels<-levels(df[,group])
 axis(2,at=at,labels=labels,mgp=c(2,0.5,0),tcl=-0.2,cex.axis=cexleft,las=2,lwd=0,lwd.ticks=1)

@@ -115,7 +115,7 @@ species_list$period<-ifelse(is.na(start),"Resident",paste(start,end,sep=" / "))
 df<-read.csv("C:/Users/God/Downloads/images/mapSpeciesres.csv")
 m<-match(gsub("_"," ",species_list$sp),df$species)
 species_list$n<-df$n[m]
-species_list$family<-df$fname[m]
+species_list$family<-df$familyname[m]
 species_list<-species_list[order(match(species_list$common,ebird$common)),]
 species_list<-species_list[order(factor(species_list$family,levels=unique(species_list$family))),] # some in ebird appear unordered
 

@@ -342,8 +342,8 @@ d[,totobs:=.N,by=.(species)]
 #save.image("/data/sdm_rbq/parameters.RData")
 
 ### Create result file
-#df<-data.frame(matrix(ncol = 15, nrow = 0))
-#colnames(df)<-c("species", "date", "n", "reach", "predictors", "range", "sd", "pearson", "spearman", "I", "D", "hullarea","family","fname","order")
+#df<-data.frame(matrix(ncol = 16, nrow = 0))
+#colnames(df)<-c("species", "date", "n", "reach", "predictors", "range", "sd", "pearson", "spearman", "I", "D", "hullarea","family","familyname","order","ordername")
 #write.table(df,file="/data/sdm_rbq/graphics/mapSpeciesres.csv",row.names=FALSE,header=TRUE,sep=",",append=FALSE)
 #df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
 
