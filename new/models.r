@@ -67,8 +67,9 @@ print(paste(species,collapse=" "))
 
 ml<-future_lapply(seq_along(species),function(j){
 
-prog<-progressr::progressor(along = species) # progressr messages not working
-prog(message = sprintf("Starting %s", species[j]))
+#j<-1
+#prog<-progressr::progressor(along = species) # progressr messages not working
+#prog(message = sprintf("Starting %s", species[j]))
 
 sp<-species[j] 
 print(paste(Sys.time(),"Running species",sp,collapse=" "))
@@ -192,11 +193,36 @@ dmesh$effoccs<-vals
 #######################################################
 ### Add artificial effort #############################
 # adds an artificial effort value when at a certain distance bdist from concave hull 
+nline<-48
 effvalue<-20#50
-bdist<-500#500
-buff<-st_buffer(concaveman(st_as_sf(st_cast(st_union(st_as_sf(spobs,coords=c("x","y"),crs=st_crs(na))),"MULTIPOINT"),concavity=2)),bdist)
-o<-!as.logical(lengths(st_intersects(dmesh,buff)))
+bdist1<-500#500
+bdist2<-1500#500
+#buff1<-st_buffer(concaveman(st_as_sf(st_cast(st_union(st_as_sf(spobs,coords=c("x","y"),crs=st_crs(na))),"MULTIPOINT"),concavity=1)),bdist1)
+#buff2<-st_buffer(concaveman(st_as_sf(st_cast(st_union(st_as_sf(spobs,coords=c("x","y"),crs=st_crs(na))),"MULTIPOINT"),concavity=1)),bdist2)
+buff1<-st_union(st_buffer(st_as_sf(st_cast(st_as_sf(spobs,coords=c("x","y"),crs=st_crs(na)),"MULTIPOINT")),bdist1))
+buff2<-st_union(st_buffer(st_as_sf(st_cast(st_as_sf(spobs,coords=c("x","y"),crs=st_crs(na)),"MULTIPOINT")),bdist2))
+o1<-!as.logical(lengths(st_intersects(dmesh,buff1)))
+o2<-!as.logical(lengths(st_intersects(dmesh,buff2)))
+o<-o1 & !o2 & st_coordinates(st_centroid(st_transform(dmesh,4326)))[,2]>nline
+o<-!o & o1 
 dmesh$effoccs[o]<-ifelse(dmesh$effoccs[o]>0,dmesh$effoccs[o],effvalue)
+
+#png("/data/sdm_rbq/graphics/effort_buffer.png",width=5,height=5,res=400,units="in")
+#par(mar=c(0,0,0,0))
+#plot(st_geometry(na),col=colmean[1],border=NA,axes=FALSE)
+#naplot(lwd=0.5)
+#plot(st_geometry(getobs(sp)),pch=16,cex=0.7,col=adjustcolor(colmean[95],0.5),add=TRUE)
+#plot(st_geometry(dmesh[o,]),col=adjustcolor("seagreen",0.3),border=NA,add=TRUE)
+#lon<-seq(-180,-50,by=1)
+#lat<-rep(nline,length(lon))
+#lat<-st_as_sf(data.frame(lon,lat),coords=c("lon","lat"),crs=4326) |> 
+#  st_combine() |> 
+#  st_cast("LINESTRING") |>
+#  st_transform(st_crs(na))
+#lat<-st_intersection(lat,dmesh)
+#plot(st_geometry(lat),col=adjustcolor("black",0.5),lwd=3,add=TRUE)
+#legend("topright",legend=c("Assumed absence",paste0("Latitude ",nline,"\u00B0N"),"Observation"),pch=c(15,NA,16),col=c(adjustcolor("seagreen",0.3),adjustcolor("black",0.95),adjustcolor(colmean[95],0.75)),pt.cex=c(1.25,1,0.9),bty="n",cex=0.9,lwd=c(NA,3,NA),seg.len=1)
+#dev.off()
 
 #dmesh$effoccs<-efftarget ### for common night hawk
 
@@ -396,7 +422,7 @@ model <- inla(formule,
 
 nameRes <- names(model)
   
-prog(message = sprintf("Model done %s", species[j]))
+#prog(message = sprintf("Model done %s", species[j]))
 
 #=============
 # Return model
@@ -517,7 +543,9 @@ results<-data.frame(
     family=d$family[match(res$species,d$species)],
     familyname=d$familyname[match(res$species,d$species)],
     order=d$order[match(res$species,d$species)],
-    ordername=d$ordername[match(res$species,d$species)]
+    ordername=d$ordername[match(res$species,d$species)],
+    max=NA,
+    hullratio=NA
 
   )
 write.table(results,file="/data/sdm_rbq/graphics/mapSpeciesres.csv",row.names=FALSE,col.names=FALSE,sep=",",append=TRUE)
@@ -525,7 +553,7 @@ write.table(results,file="/data/sdm_rbq/graphics/mapSpeciesres.csv",row.names=FA
 print(j) 
 res
 
-prog(message = sprintf("Results done %s", species[j]))
+#prog(message = sprintf("Results done %s", species[j]))
 
 }, future.packages = "data.table", future.seed=TRUE)
 plan(sequential)

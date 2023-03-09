@@ -16,6 +16,7 @@ if(FALSE){
   system("powershell -command \"scp -p rouf1703@pose.vhost33:'/data/sdm_rbq/stab/stab.zip' C:/Users/God/Downloads/images\"",intern=TRUE)
   system("powershell -command \"scp -p rouf1703@pose.vhost33:'/data/sdm_rbq/figures/figures.zip' C:/Users/God/Downloads/images\"",intern=TRUE)
   system("powershell -command \"scp -p rouf1703@pose.vhost33:'/data/sdm_rbq/graphics/mapSpeciesres.csv' C:/Users/God/Downloads/images\"",intern=TRUE)
+  system("powershell -command \"scp -p rouf1703@pose.vhost33:'/data/sdm_rbq/graphics/*{results_detailed,bird_maps,spatial_effect,visual_abstract,overlap,effort_effect}.png' C:/Users/God/Downloads/images\"",intern=TRUE)
  
   system("powershell -command \"Get-ChildItem 'C:/Users/God/Downloads/images' -Filter *.zip | Expand-Archive -DestinationPath 'C:/Users/God/Downloads/images' -Force\"",intern=TRUE)
   
@@ -45,7 +46,7 @@ if(FALSE){
   
   
   df<-read.csv("C:/Users/God/Downloads/images/mapSpeciesres.csv")
-  w<-which(df$reach<0.85 | is.na(df$reach))
+  w<-which(df$reach<0.85 | is.na(df$reach) | df$hullratio>4 | df$max>10000)
   invisible(lapply(w,function(i){
     path<-paste0("C:/Users/God/Downloads/images/",gsub(" ","_",df$species[i]),"_sdm_small.png")  
     if(file.exists(path)){

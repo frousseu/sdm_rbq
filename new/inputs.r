@@ -6,7 +6,7 @@ library(mapSpecies)
 species<-c("Setophaga pinus","Setophaga americana","Setophaga petechia","Setophaga citrina","Setophaga ruticilla","Setophaga virens")
 species<-c("Dolichonyx oryzivorus")
 species<-c("Leucosticte australis","Toxostoma bendirei","Haematopus palliatus","Setophaga americana")#[4]
-species<-c("Calidris subruficollis")
+species<-c("Dryocopus pileatus","Setophaga coronata","Setophaga dominica")
 tab<-table(d$species)
 tab<-names(tab)[tab>30]
 tab<-tab[d$ebird[match(tab,d$ebird)]%in%ed$scientific_name]
@@ -16,7 +16,7 @@ df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
 #dontsp<-df$species[!is.na(df$I)]
 dontsp<-df$species
 tab<-tab[!tab%in%dontsp]
-species<-sample(tab,length(tab))
+#species<-sample(tab,length(tab))
 species<-species[sapply(species,function(i){print(i);nrow(getobs(i))>5})]
 stopifnot(length(species)>0)
 (lspecies<-species)
@@ -63,12 +63,9 @@ vars_pool<-c("tmean","tmean2","deciduous_esa","builtup_esa","crop_esa","grass_es
 
 vars_pool<-c("tmean","tmean2","deciduous_esa","builtup_esa","crop_esa","grass_esa","mixed_esa","shrubs_esa","conifers_esa","logdistance","elevation")
 
-vars_pool<-c("tmean","tmean2","deciduous_esa","builtup_esa","crop_esa","grass_esa","mixed_esa","shrubs_esa","conifers_esa","logdistance","elevation","elevation2")
+vars_pool<-c("tmean","tmean2","deciduous_esa","builtup_esa","crop_esa","grass_esa","mixed_esa","shrubs_esa","conifers_esa","logdistance","elevation","elevation2")  # march one
 
-#vars_pool<-c("builtup_esa")
-
-#vars_pool<-c("tmean","tmean2")
-
+vars_pool<-c("tmean","tmean2","deciduous_esa","builtup_esa","crop_esa","grass_esa","mixed_esa","shrubs_esa","conifers_esa","logdistance","elevation","elevation2","truggedness","water_esa")
 
 #vars<-c("tmean","tmean2","broadleafs","builtup","cultivated","herbaceous","mixed","shrubs","conifers","harsh","conifers_longitude","longitude")
 #vars<-c("forested","forested2")

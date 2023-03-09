@@ -278,7 +278,8 @@ getobs<-function(sp){
 
 #xx<-getobs("Setophaga petechia")
 
-overlapHist<-function(x="I",sp=NULL,th=0.85,n=0){
+overlapHist<-function(x="I",sp=NULL,th=0.85,hullratio=4,vmax=10000,n=50){
+  # n is ignored
   df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
   if(is.null(sp)){
     path<-"/data/sdm_rbq/graphics/overlap.png"
@@ -291,7 +292,7 @@ overlapHist<-function(x="I",sp=NULL,th=0.85,n=0){
   png(path,width=12,height=9,units="in",res=400)
   par(bg=bg)
   ag<-df[,x]
-  ag<-ag[which(df$reach>=th & df$n>=n)]
+  ag<-ag[which(df$reach>=th & df$hullratio<hullratio & df$max<vmax)]
   brks<-seq(0.0,1,by=0.1)
   h<-hist(ag,xlim=c(0,1),breaks=brks,border="white",lwd=5,col=adjustcolor("seagreen",0.5),main="",xaxt="n",yaxt="n",xlab="",ylab="")
   yat<-pretty(h$counts)
@@ -725,7 +726,7 @@ animate<-function(sdm,sp){
   height=0.37
   cex=0.75
   ims<-lapply(seq_along(samps),function(i){
-    png(paste0("/data/sdm_rbq/temp/animation",sp,i,".png"),width=5,height=5,res=400,units="in")
+    png(paste0("/data/sdm_rbq/temp/animation",sp,i,".png"),width=5,height=5,res=300,units="in")
     #im <- image_graph(width = 900, height = 800, res = 96)
     #map(samps[i],range=zlim,obs=FALSE)
     plot(sdm[[samps[i]]],col=colmean,mar=c(0,0,0,0),legend=FALSE,axes=FALSE)
@@ -736,8 +737,11 @@ animate<-function(sdm,sp){
   lf<-list.files("/data/sdm_rbq/temp",pattern=paste0("animation",sp),full=TRUE)
   img<-lapply(lf,image_read)
   img<-do.call("c",img)
-  img<-image_scale(img,"x450")
-  img<-image_quantize(img,max=100,dither=TRUE)
+  img<-image_scale(img,"x350")
+  #img<-image_convert(img,matte=FALSE)
+  #img<-image_quantize(img,max=100,dither=TRUE)
+  #img<-image_colorize(img, 40, "white")
+  #plot(img[1])
   animation <- image_animate(img, fps = 10, optimize = TRUE)
   image_write(animation,paste0("/data/sdm_rbq/figures/",gsub(" ","_",sp),"_gif.gif"))
 }

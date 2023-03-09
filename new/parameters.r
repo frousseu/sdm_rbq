@@ -343,7 +343,7 @@ d[,totobs:=.N,by=.(species)]
 
 ### Create result file
 #df<-data.frame(matrix(ncol = 16, nrow = 0))
-#colnames(df)<-c("species", "date", "n", "reach", "predictors", "range", "sd", "pearson", "spearman", "I", "D", "hullarea","family","familyname","order","ordername")
+#colnames(df)<-c("species", "date", "n", "reach", "predictors", "range", "sd", "pearson", "spearman", "I", "D", "hullarea","family","familyname","order","ordername","max","hullratio")
 #write.table(df,file="/data/sdm_rbq/graphics/mapSpeciesres.csv",row.names=FALSE,header=TRUE,sep=",",append=FALSE)
 #df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
 

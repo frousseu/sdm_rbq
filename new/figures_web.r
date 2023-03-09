@@ -30,7 +30,7 @@ source(textConnection(code))
 
 df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
 
-overlapHist(x="I",th=0.85,n=50)
+overlapHist(x="I",th=0.85,hullratio=4,vmax=10000,n=50)
 #o<-overlapHist(sp="Columbia livia")
 #plot(image_read(o$path),"#FFFFFF00")
 
@@ -53,6 +53,7 @@ path<-"/data/sdm_rbq/pics"
 
 df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
 #sps<-c("Buteo jamaicensis","Buteo lagopus","Buteo platypterus")
+#df<-df[1:30,]
 sps<-sort(df$species)#[1:18]
 #sps<-sps[544:length(sps)]
 #i<-c("Acanthis hornemanni")
@@ -101,7 +102,7 @@ lapply(sps,function(i){
 ###################################################################
 ###################################################################
 
-if(FALSE){ # already ran with modelss
+if(FALSE){ # already ran with models
 
 lf<-list.files("/data/sdm_rbq/stab/")
 lf<-sapply(strsplit(lf,"_"),function(i){paste(i[1:2],collapse=" ")})
@@ -145,10 +146,10 @@ lapply(sp,function(i){
 
 
 df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
-spc<-df$species[which(df$I>=0.75 & df$I<=0.95 & df$reach>=0.85 & df$n>=100)]
-spc
+#spc<-df$species[which(df$I>=0.75 & df$I<=0.95 & df$reach>=0.85 & df$n>=100)]
 #df<-df[df$date>="2023-02-12 00:00:00",]
 
+df<-df[1:30,]
 lsp<-unique(df$species)#[1]
 #i<-"Catharus bicknelli"
 #lsp<-i
@@ -158,7 +159,7 @@ lsp<-unique(df$species)#[1]
 #cores<-nbrOfWorkers() # get nbr of workers from the chosen plan
 #chunks <- split(1:length(lsp), rep(1:cores, each=ceiling(length(lsp)/cores))[1:length(lsp)])
 
-cl<-makeCluster(20)
+cl<-makeCluster(15)
 registerDoParallel(cl)
 foreach(i=lsp,.packages=c("sf","terra","magick","FRutils","data.table","FNN","colorspace")) %dopar% {
 #res<-future_lapply(chunks,function(chunksi){

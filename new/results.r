@@ -1,4 +1,6 @@
 
+# find . -type f -name '*Calidris_himantopus*'
+
 # this is the part of results (cor, I) that comes from the old visualizations.r file
 
 library(tidyr)
@@ -10,6 +12,88 @@ library(magick)
 library(jsonlite)
 library(exiftoolr)
 library(colorspace)
+library(rmapshaper)
+library(smoothr)
+
+#######################################################################
+### Get max value #####################################################
+#######################################################################
+
+lsdms<-list.files("/data/sdm_rbq/rasters",pattern="_birds.tif",full=TRUE)
+#sdms<-lapply(lsdms,rast)
+
+plan(multisession,workers=20)
+cores<-nbrOfWorkers() # get nbr of workers from the chosen plan
+chunks <- split(lsdms, rep(1:cores, each=ceiling(length(lsdms)/cores))[1:length(lsdms)])
+
+maxs<-future_lapply(chunks,function(i){
+  m<-lapply(i,function(j){
+    global(rast(j,lyrs=1),"max",na.rm=TRUE)
+  })
+  m<-do.call("rbind",m)
+  m$species<-basename(i)
+  m
+})
+plan(sequential)
+maxs<-do.call("rbind",maxs)
+maxs$species<-gsub("_"," ",gsub("_birds.tif","",maxs$species))
+df$max<-maxs$max[match(df$species,maxs$species)]
+
+
+#######################################################################
+### Get ratio value ###################################################
+#######################################################################
+
+# Since we already have max intensity value and convex hull area, we only need the convex hull of the predicted range
+
+sp<-"Aratinga nenday"
+occs<-getobs(sp)
+sdm<-rast(file.path("/data/sdm_rbq/rasters/",paste0(gsub(" ","_",sp),"_birds.tif")))[[1]]
+
+
+
+r<-sdm
+r<-r/global(r,"max",na.rm=TRUE)[1,1]
+th<-0.05
+r[r<th]<-NA
+r[r>=th]<-1
+v <- as.polygons(r)
+v<-st_as_sf(v)
+vh<-st_convex_hull(v)
+oh<-st_convex_hull(st_union(occs))
+as.numeric(st_area(vh)/st_area(oh))
+
+
+lsdms<-list.files("/data/sdm_rbq/rasters",pattern="_birds.tif",full=TRUE)
+#sdms<-lapply(lsdms,rast)
+
+plan(multisession,workers=15)
+#cores<-nbrOfWorkers() # get nbr of workers from the chosen plan
+#chunks <- split(lsdms, rep(1:cores, each=ceiling(length(lsdms)/cores))[1:length(lsdms)])
+hr<-future_lapply(1:nrow(df),function(i){
+   rpath<-file.path("/data/sdm_rbq/rasters",paste0(gsub(" ","_",df$species[i]),"_birds.tif"))
+   r<-rast(rpath)[[1]]
+   if(is.na(df$max[i]) | is.na(df$hullarea[i])){
+     NA
+   }else{
+     r<-r/df$max[i]
+     th<-0.1
+     r[r<th]<-NA
+     r[r>=th]<-1
+     v <- as.polygons(r)
+     v<-st_as_sf(v)
+     vh<-st_convex_hull(v)
+     oh<-df$hullarea[i]
+     as.numeric(st_area(vh)/oh)
+   }
+})
+plan(sequential)
+df$hullratio<-unlist(hr)
+
+
+table(df$reach<0.85)
+table(df$reach>0.85 & df$hullratio>4)
+table(df$reach>0.85 & df$hullratio<4 & df$max>10000)
 
 
 #######################################################################
@@ -95,6 +179,37 @@ m<-match(df$species,res$species)
 df$pearson<-ifelse(!is.na(m),res$pearson[m],df$pearson)
 df$I<-ifelse(!is.na(m),res$I[m],df$I)
 write.csv(df,file="/data/sdm_rbq/graphics/mapSpeciesres.csv",row.names=FALSE,append=FALSE)
+
+########################################################################
+### Rejected or not ####################################################
+########################################################################
+
+library(rmapshaper)
+library(smoothr)
+
+sp<-"Spizella passerina"
+occs<-getobs(sp)
+sdm<-rast(file.path("/data/sdm_rbq/rasters/",paste0(gsub(" ","_",sp),"_birds.tif")))[[1]]
+
+r<-sdm
+r<-r/global(r,"max",na.rm=TRUE)[1,1]
+th<-0.1
+r[r<th]<-NA
+r[r>=th]<-1
+v <- as.polygons(r)
+v<-st_as_sf(v)
+#v<-ms_simplify(v,0.01)
+v<-smooth(v,method="ksmooth",smoothness=10)
+par(mar=c(0,0,0,0))
+plot(st_geometry(na),col="grey90",border=NA)
+plot(st_geometry(v),col=adjustcolor("red",0.3),border=NA,lwd=5,add=TRUE)
+naplot(lwd=0.5)
+plot(st_geometry(occs),pch=16,cex=0.75,col=adjustcolor("black",0.5),add=TRUE)
+vh<-st_convex_hull(v)
+oh<-st_convex_hull(st_union(occs))
+plot(st_geometry(vh),border=adjustcolor("red",0.3),lwd=5,add=TRUE)
+plot(st_geometry(oh),border=adjustcolor("black",0.3),lwd=5,,add=TRUE)
+as.numeric(st_area(vh)/st_area(oh))
 
 
 ########################################################################
