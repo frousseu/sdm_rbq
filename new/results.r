@@ -50,6 +50,10 @@ sp<-"Aratinga nenday"
 occs<-getobs(sp)
 sdm<-rast(file.path("/data/sdm_rbq/rasters/",paste0(gsub(" ","_",sp),"_birds.tif")))[[1]]
 
+#library(terra)
+#sdm<-rast(file.path("/data/sdm_rbq/rasters/",paste0(gsub(" ","_","Zenaida macroura"),"_birds.tif")))
+
+#writeRaster(sdm,file.path("/data/sdm_rbq/rasters/",paste0(gsub(" ","_","Zenaida macroura"),"_birds2.tif")),overwrite=TRUE, gdal=c("COMPRESS=DEFLATE"))
 
 
 r<-sdm

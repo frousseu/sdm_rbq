@@ -6,7 +6,17 @@ library(mapSpecies)
 species<-c("Setophaga pinus","Setophaga americana","Setophaga petechia","Setophaga citrina","Setophaga ruticilla","Setophaga virens")
 species<-c("Dolichonyx oryzivorus")
 species<-c("Leucosticte australis","Toxostoma bendirei","Haematopus palliatus","Setophaga americana")#[4]
-species<-c("Dryocopus pileatus","Setophaga coronata","Setophaga dominica")
+species<-c("Pandion haliaetus")
+species<-c("Pandion haliaetus", "Setophaga coronata", "Setophaga dominica", 
+"Dryocopus pileatus", "Empidonax alnorum", "Empidonax flaviventris", 
+"Empidonax minimus", "Spatula clypeata", "Cyanocompsa parellina", 
+"Basileuterus culicivorus", "Calidris fuscicollis", "Calidris ruficollis", 
+"Grus americana", "Asio flammeus", "Calidris maritima", "Calidris alba", 
+"Vireo vicinior", "Surnia ulula", "Helmitheros vermivorum", "Sterna paradisaea", 
+"Haliaeetus leucocephalus", "Bubo virginianus", "Haemorhous mexicanus", 
+"Bubo scandiacus", "Haematopus palliatus", "Brotogeris versicolurus", 
+"Brotogeris chiriri", "Poecile gambeli", "Arenaria interpres"
+)[24:29]
 tab<-table(d$species)
 tab<-names(tab)[tab>30]
 tab<-tab[d$ebird[match(tab,d$ebird)]%in%ed$scientific_name]

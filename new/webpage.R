@@ -17,6 +17,7 @@ if(FALSE){
   system("powershell -command \"scp -p rouf1703@pose.vhost33:'/data/sdm_rbq/figures/figures.zip' C:/Users/God/Downloads/images\"",intern=TRUE)
   system("powershell -command \"scp -p rouf1703@pose.vhost33:'/data/sdm_rbq/graphics/mapSpeciesres.csv' C:/Users/God/Downloads/images\"",intern=TRUE)
   system("powershell -command \"scp -p rouf1703@pose.vhost33:'/data/sdm_rbq/graphics/*{results_detailed,bird_maps,spatial_effect,visual_abstract,overlap,effort_effect}.png' C:/Users/God/Downloads/images\"",intern=TRUE)
+#  system("powershell -command \"scp -p rouf1703@pose.vhost33:'/data/sdm_rbq/graphics/*{reach_vs_n}.png' C:/Users/God/Downloads/images\"",intern=TRUE)
  
   system("powershell -command \"Get-ChildItem 'C:/Users/God/Downloads/images' -Filter *.zip | Expand-Archive -DestinationPath 'C:/Users/God/Downloads/images' -Force\"",intern=TRUE)
   
@@ -132,7 +133,8 @@ head(data.frame(toc_ref,toc_species))
 
 
 #src<-"https://res.cloudinary.com/dphvzalf9/image/upload"
-src<-"images"
+src<-"https://object-arbutus.cloud.computecanada.ca/mapSpecies"
+#src<-"images"
 
 species<-function(sp,url,copyright,ebirdurl,common,period,n){
   
@@ -176,7 +178,7 @@ species<-function(sp,url,copyright,ebirdurl,common,period,n){
       <img style=\"height: 20vw; padding: 0px;\" src=\"",file.path(src,sp),"_ebird_small.png\" alt=\"\">
     </div>
     <div class=\"col4\">
-      <img style=\"height: 16vw; padding-top: 20%;\" src=\"",file.path(src,sp),"_over.png\" alt=\"\">
+      <img style=\"height: 16vw; padding-top: 20%;\" src=\"",file.path(src,sp),"_over_small.png\" alt=\"\">
     </div>
   </div>
 </section>

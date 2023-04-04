@@ -83,9 +83,10 @@ ed$species[ed$species=="Larus canus/brachyrhynchus"]<-"Larus brachyrhynchus"
 #################################################################
 ### Load data ###################################################
 
-cols<-c("class","genus","species","infraspecificEpithet","countryCode","stateProvince","decimalLatitude","decimalLongitude","coordinateUncertaintyInMeters","day","month","year","recordedBy","occurrenceID")
+cols<-c("phylum","class","genus","species","infraspecificEpithet","countryCode","stateProvince","decimalLatitude","decimalLongitude","coordinateUncertaintyInMeters","day","month","year","recordedBy","occurrenceID")
 d<-fread("/data/predictors_sdm/inat/0425942-210914110416597.csv",encoding="UTF-8",nThread=10,select=cols) 
 d<-d[class%in%c("Aves"),]
+#d<-d[phylum%in%c("Tracheophyta"),]
 d<-d[countryCode%in%c("US","CA"),]
 d<-d[!stateProvince%in%c("Hawaii"),]
 d<-d[species!="",]

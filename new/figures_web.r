@@ -281,7 +281,6 @@ stopCluster(cl)
 ### web maps
 cl<-makeCluster(20)
 registerDoParallel(cl)
-"/data/sdm_rbq/temp"
 lsp<-list.files("/data/sdm_rbq/temp",full=TRUE,pattern=".png")
 lsp<-lsp[-grep("_small.",lsp)]
 #lsp<-lsp[grep("Spizella_pallida",lsp)]
@@ -349,3 +348,30 @@ foreach(i=lsp,.packages=c("magick")) %dopar% {
   image_write(gsub(".png","_small.png",i))
 }
 stopCluster(cl)
+
+
+### rejected
+png("/data/sdm_rbq/graphics/rejected.png",width=500,height=500,units="px")
+par(mar=c(0,0,0,0))
+plot(0.5,0.5,axes=FALSE,xaxt="n",yaxt="n",pch=1,lwd=20,cex=80,xlim=0:1,ylim=0:1)
+lines(c(0.17,0.83),c(0.17,0.83),lwd=20)
+dev.off()
+im<-image_read("/data/sdm_rbq/graphics/rejected.png")
+im<-image_trim(im)
+im<-image_scale(im,"500")
+im<-image_quantize(im,2)
+table(image_raster(im)[,3])
+im<-image_transparent(im,"#ffffffff",fuzz=1)
+rejected<-image_fill(im,"#00000033","+250+1")
+
+df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
+w<-which(df$reach<0.85 | is.na(df$reach) | df$hullratio>4 | df$max>10000)
+invisible(lapply(w,function(i){
+  path<-paste0("/data/sdm_rbq/temp/",gsub(" ","_",df$species[i]),"_sdm_small.png")  
+  if(file.exists(path)){
+    sdm<-image_read(path)
+    im<-image_composite(sdm,rejected)
+    image_write(im,path)
+  }
+}))
+

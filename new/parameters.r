@@ -39,7 +39,7 @@ checkpoint("Region and domain done")
 
 
 
-pedge<-0.002
+pedge<-0.002 #0.002
 edge<-min(c(diff(st_bbox(region)[c(1,3)])*pedge,diff(st_bbox(region)[c(2,4)])*pedge))
 edge
 
@@ -567,6 +567,20 @@ if(FALSE){
     mtext(side=3,line=-6,text=i,adj=0.90,col="white",font=2)
     })
     dev.off()
+
+    par(mar=c(0,0,0,0))
+    plot(st_geometry(dmesh))
+    plot(st_geometry(na),add=TRUE)
+    plot(Mesh,add=TRUE)
+
+
+
+
+
+
+
+
+
 }
 
 

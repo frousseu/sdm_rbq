@@ -35,6 +35,7 @@ source("/data/sdm_rbq/functions.r",echo=TRUE)
 source("/data/sdm_rbq/inputs.r",echo=TRUE)
 
 checkpoint("Data loaded")
+options(vsc.dev.args = list(width = 1000, height = 800))
 
 ### This runs models for each species and produces necessary model outputs
 # The number of cores used is adjusted according to the number of species
@@ -535,7 +536,7 @@ results<-data.frame(
     predictors=res$predictors,
     range=res$range,
     sd=res$sd,
-    pearson=NA,
+    pearson=NA,ratio
     spearman=NA,
     I=NA,
     D=NA,
@@ -806,3 +807,253 @@ plot(dmesh["predictor"],pal=magma,nbreaks=200,border=NA,reset=FALSE)
 plot(st_geometry(na),border=adjustcolor("white",0.5),add=TRUE)
 
 }
+
+
+
+
+if(FALSE){
+
+remotes::install_github("frousseu/ewlgcpSDM",auth_token=readLines("/home/rouf1703/github_token_pose"),upgrade="never")
+
+flex_buffer<-function(
+    obs,
+    nline=48,
+    dist=c(500,1500)
+){
+  # https://r-spatial.github.io/sf/articles/sf7.html#buffers-1
+
+  radius<-s2_earth_radius_meters()*pi*2*0.25*((90-nline)/90)
+  npole<-s2_buffer_cells(as_s2_geography("POINT(-100 90)"),distance=radius,max_cells=10000) # visible half
+  g<-as_s2_geography(TRUE)
+  north<-s2_intersection(npole, g)
+  north<-st_transform(st_as_sfc(north),st_crs(na))
+
+
+
+  buff1<-st_union(st_buffer(obs[lengths(st_intersects(obs,north))==0L,],dist[1]))
+  buff2<-st_union(st_buffer(obs[lengths(st_intersects(obs,north))>0L,],dist[2]))
+
+  bnorth<-st_cast(st_intersection(buff2,north),"POLYGON")
+  o<-st_intersects(bnorth,na)
+  bnorth<-bnorth[lengths(o)>0]
+  #bsouth<-st_cast(st_difference(buff1,north),"POLYGON")
+  bsouth<-st_cast(buff1,"POLYGON")
+  o<-st_intersects(bsouth,na)
+  bsouth<-bsouth[lengths(o)>0]
+  buff<-st_union(bnorth,bsouth) |> st_union()
+  #plot(st_geometry(na))
+  #plot(st_geometry(buff),col=adjustcolor("black",0.15),border=NA,add=TRUE)
+  #plot(st_geometry(obs),add=TRUE)
+  #plot(st_geometry(bnorth),col="blue",add=TRUE)
+  #plot(st_geometry(bsouth),col="red",add=TRUE)
+  #lpols<-lapply(buff, function(x) x[1])
+  #buff<-st_multipolygon(lpols) # remove holes https://github.com/r-spatial/sf/issues/609
+  buff
+}
+
+
+library(ewlgcpSDM)
+library(predicts)
+library(s2)
+
+sp<-"Spizella pusilla" 
+
+be<-unlist(ed[match(sp,ed$scientific_name),c("start","end")])
+### all obs for period
+if(be[1]<be[2]){
+  background<-d[md>=be[1] & md<=be[2],]
+}else{
+  # Tyrannus savanna breeds from nov to jan
+  dr<-substr(seq.Date(as.Date(paste0("2007-",be[1])),as.Date(paste0("2008-",be[2])),by=1),6,10)
+  background<-d[md%in%dr,]
+}
+background<-unique(background,by=c("recordedBy","species","cell"))
+obs<-background[species==sp,]
+
+obs<-st_as_sf(obs,coords=c("x","y"),crs=st_crs(na))
+background<-st_as_sf(background,coords=c("x","y"),crs=st_crs(na))
+#buff<-st_buffer(st_combine(obs),500)
+#buff<-st_union(st_buffer(obs,500))
+buff<-flex_buffer(obs,nline=48,dist=c(500,1500))
+
+
+tb1<-background[sample(1:nrow(background),100000),]
+tb2<-st_as_sf(st_sample(st_union(st_difference(na,buff)),50000))
+st_geometry(tb2)<-"geometry"
+tb<-rbind(tb1[,names(tb2)],tb2)
+#plot(st_geometry(tb),add=TRUE)
+
+
+# fit model
+#mep<-aggregate(predictors[[c("tmean","trange","prec","elevation","truggedness","latitude","longitude",grep("_esa",names(predictors),value=TRUE))]],8,na.rm=TRUE)
+me <- MaxEnt(mep,vect(obs),vect(tb),args=c("-q","-l","-p"))
+#me <- MaxEnt(mep,vect(obs),args=c("-p","-h"))
+mer <- predict(me, mep)
+mer <- mask(mer,vect(na))
+plot(mer,mar=c(0,0,0,8),plg=list(size=c(0.8,1)),col=colmean)
+naplot()
+#plot(st_geometry(obs),pch=1,cex=1,col=adjustcolor("black",0.5),add=TRUE)
+
+i<-gsub(" ","_",sp)
+r1<-raster(file.path("/data/sdm_rbq/rasters",paste0(i,"_birds.tif")),layer=1)
+r2<-raster(file.path("/data/predictors_sdm/expert_maps/eBird/abundance",paste0(i,"_ebird2.tif")),layer=1)
+r3<-resample(raster(mer),r2)
+nicheOverlap(r1,r2,stat="I")
+nicheOverlap(r3,r2,stat="I")
+#nicheOverlap(r1,r3,stat="I")
+#r4<-mean(c(rast(r1)/global(rast(r1),"max",na.rm=TRUE)[1,1],rast(r3)/global(rast(r3),"max",na.rm=TRUE)[1,1]));plot(r4,col=colmean);#nicheOverlap(raster(r4),r2,stat="I")
+#r4<-rast(r1)/global(rast(r1),"max",na.rm=TRUE)[1,1]*rast(r3)/global(rast(r3),"max",na.rm=TRUE)[1,1];plot(r4,col=colmean);#nicheOverlap(raster(r4),r2,stat="I")
+
+r11<-rast(r1)
+r11<-r11/global(r11,"max",na.rm=TRUE)[1,1]
+th<-0.1
+r11[r11<th]<-NA
+r11[r11>=th]<-1
+v <- as.polygons(r11)
+v<-st_as_sf(v)
+
+r11<-rast(r1)
+r11<-r11/global(r11,"max",na.rm=TRUE)[1,1]
+r11<-mask(r11,vect(v),inverse=TRUE,updatevalue=1)
+r4<-r11*rast(r3)
+
+r11
+r4<-rast(r1)/global(rast(r1),"max",na.rm=TRUE)[1,1]*rast(r3)/global(rast(r3),"max",na.rm=TRUE)[1,1]
+
+
+plot(rast(r1),col=colmean)
+naplot()
+plot(st_geometry(v),col=adjustcolor("black",0.15),add=TRUE)
+
+r33<-rast(r3)
+r33<-mask(r33,vect(v),inverse=FALSE,updatevalue=0)
+r33<-mask(r33,vect(na))
+plot(r33,col=colmean)
+naplot()
+plot(st_geometry(v),col=adjustcolor("black",0.15),add=TRUE)
+#nicheOverlap(raster(r33),r2,stat="I")
+
+
+
+
+plan(multicore,workers=5)
+params<-dmesh_mesh(Mesh)
+params<-dmesh_weights(params,region)
+params<-dmesh_predictors(params,r)
+params<-dmesh_effort(params,obs=obs,background=background,buffer=buff,adjust=TRUE)
+plan(sequential)
+
+
+m<-ewlgcp(
+  formula=formula(paste("y~",paste0(setdiff(vars_pool,"logdistance"),collapse="+"))),
+  dmesh=params,
+  effort = TRUE,
+  adjust = FALSE,
+  buffer = TRUE,
+  orthogonal = TRUE,
+  prior.beta = NULL,
+  prior.range = c(50,0.1),
+  prior.sigma = c(1,0.1),
+  smooth = 3/2
+)
+
+sdm<-ewlgcpSDM::map(model=m,
+         dmesh=params,
+         dims=c(1500,1500),
+         region = region,
+         sample = FALSE,
+         nsamples = 100
+     )
+
+sdm<-mask(sdm,vect(na))
+
+
+plot(sdm$mean,col=colmean,plg=list(size=c(0.8,1)))
+naplot()
+plot(st_geometry(obs),add=TRUE)
+
+
+
+#r5<-raster(resample(sdm$mean,rast(r1)))
+
+
+}
+
+
+dm<-params$dmesh
+
+o<-st_intersects(background,dm)
+splist<-data.frame(species=background$species,id=dm$id[unlist(o)])
+res<-aggregate(species~id,
+               data=splist,FUN=function(i){
+                     length(unique(i))
+               }
+)
+nsp<-res$species[match(dm$id,res$id)]
+nsp[is.na(nsp)]<-0
+pres<-as.integer(nobs>0)
+vals<-nobs*rescale_ab(pres/nsp,a=1,b=max(nsp))
+vals<-ifelse(is.nan(vals) | is.infinite(vals),0,vals)
+
+
+
+
+mepp<-wrap(mep)
+
+
+cl<-makeCluster(20)
+registerDoParallel(cl)
+lsp<-sample(df$species[which(!is.na(df$I) & df$reach>=0.85)],80)
+comp<-foreach(sp=lsp,.packages=c("dismo","raster","terra","predicts","sf","data.table","s2")) %dopar% {
+
+be<-unlist(ed[match(sp,ed$scientific_name),c("start","end")])
+### all obs for period
+if(be[1]<be[2]){
+  background<-d[md>=be[1] & md<=be[2],]
+}else{
+  # Tyrannus savanna breeds from nov to jan
+  dr<-substr(seq.Date(as.Date(paste0("2007-",be[1])),as.Date(paste0("2008-",be[2])),by=1),6,10)
+  background<-d[md%in%dr,]
+}
+background<-unique(background,by=c("recordedBy","species","cell"))
+obs<-background[species==sp,]
+
+obs<-st_as_sf(obs,coords=c("x","y"),crs=st_crs(na))
+background<-st_as_sf(background,coords=c("x","y"),crs=st_crs(na))
+#buff<-st_buffer(st_combine(obs),500)
+#buff<-st_union(st_buffer(obs,500))
+buff<-flex_buffer(obs,nline=48,dist=c(500,1500))
+
+
+tb1<-background[sample(1:nrow(background),min(100000,nrow(background))),]
+tb2<-st_as_sf(st_sample(st_union(st_difference(na,buff)),50000))
+st_geometry(tb2)<-"geometry"
+tb<-rbind(tb1[,names(tb2)],tb2)
+#plot(st_geometry(tb),add=TRUE)
+
+
+# fit model
+#mep<-aggregate(predictors[[c("tmean","trange","prec","elevation","truggedness","latitude","longitude",grep("_esa",names(predictors),value=TRUE))]],8,na.rm=TRUE)
+me <- MaxEnt(rast(mepp),vect(obs),vect(tb),args=c("-q","-l","-p"))
+#me <- MaxEnt(mep,vect(obs),args=c("-p","-h"))
+mer <- predict(me, rast(mepp))
+#mer <- mask(mer,vect(na))
+#plot(mer,mar=c(0,0,0,8),plg=list(size=c(0.8,1)),col=colmean)
+#naplot()
+#plot(st_geometry(obs),pch=1,cex=1,col=adjustcolor("black",0.5),add=TRUE)
+
+i<-gsub(" ","_",sp)
+r1<-raster(file.path("/data/sdm_rbq/rasters",paste0(i,"_birds.tif")),layer=1)
+r2<-raster(file.path("/data/predictors_sdm/expert_maps/eBird/abundance",paste0(i,"_ebird2.tif")),layer=1)
+r3<-resample(raster(mer),r2)
+comp<-c(
+  nicheOverlap(r1,r2,stat="I"),
+  nicheOverlap(r3,r2,stat="I")
+)
+}
+
+
+stopCluster(cl)
+mmcomp<-do.call("rbind",comp)
+mmcomp
+colMeans(mmcomp)

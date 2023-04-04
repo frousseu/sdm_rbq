@@ -169,3 +169,14 @@ im<-image_border(im,"white","20x20")
 im<-image_annotate(im,"A",gravity="northwest",location="+50+40",size=150,weight=800,color="#44444444")
 #plot(im)
 image_write(im,"/data/sdm_rbq/graphics/results_detailed.png")
+
+
+
+
+
+df<-read.csv("/data/sdm_rbq/graphics/mapSpeciesres.csv")
+png("/data/sdm_rbq/graphics/reach_vs_n.png",width=10,height=5,res=300,units="in")
+par(mfrow=c(1,2),mar=c(4.5,3,1,1))
+plot(df$n,df$reach,xlab="Number of observations (n)",ylab="Reach")
+plot(df$n,df$reach,xlab="log(Number of observations) (log(n))",ylab="Reach",log="x")
+dev.off()
